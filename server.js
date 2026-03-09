@@ -85,7 +85,10 @@ async function downloadAudio(query, outputPath) {
 
         // Si existe cookies.txt, usarlo para evadir el bloqueo de bot definitivamente
         const cookiesPath = path.join(__dirname, 'cookies.txt');
-        if (fs.existsSync(cookiesPath)) {
+        const exists = fs.existsSync(cookiesPath);
+        log(`Checking for cookies at: ${cookiesPath} - Exists: ${exists}`);
+
+        if (exists) {
             log('Using cookies.txt for authentication');
             options.cookies = cookiesPath;
         } else {
