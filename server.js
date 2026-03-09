@@ -69,8 +69,83 @@ async function downloadFile(url, outputPath) {
     return outputPath;
 }
 
-// Helper: Multi-API Audio Downloader (Solución Definitiva)
+// Helper: Fetch YouTube URL from Piped (Proxy Search)
+async function fetchYouTubeUrl(query) {
+    try {
+        log(`[Piped] Buscando video para: ${query}`);
+        const res = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=videos`);
+        const data = await res.json();
+
+        if (data.items && data.items.length > 0) {
+            const videoId = data.items[0].url.split('v=')[1];
+            const url = `https://www.youtube.com/watch?v=${videoId}`;
+            log(`[Piped] Video encontrado: ${url}`);
+            return url;
+        }
+        throw new Error('No se encontraron videos en Piped');
+    } catch (e) {
+        log(`[Piped Error] ${e.message}`);
+        return null;
+    }
+}
+
+// Helper: Download via Cobalt Instance (Proxy Download)
+async function downloadWithCobalt(youtubeUrl, outputPath) {
+    const instances = [
+        'https://api.cobalt.tools',
+        'https://cobalt.asdfghjkl.ovh',
+        'https://api.cobalt.run'
+    ];
+
+    for (const api of instances) {
+        try {
+            log(`[Cobalt] Intentando con instancia: ${api}`);
+            const res = await fetch(api, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: youtubeUrl,
+                    downloadMode: 'audio',
+                    audioFormat: 'mp3',
+                    audioBitrate: '320'
+                })
+            });
+
+            const data = await res.json();
+            if (data.status === 'stream' || data.status === 'redirect' || data.status === 'tunnel') {
+                const downloadUrl = data.url;
+                log(`[Cobalt] Link obtenido: ${downloadUrl}`);
+                await downloadFile(downloadUrl, outputPath);
+                return true;
+            }
+            throw new Error(data.message || 'Estado fallido');
+        } catch (e) {
+            log(`[Cobalt Error] Instancia ${api} falló: ${e.message}`);
+        }
+    }
+    return false;
+}
+
+// Helper: Multi-API Audio Downloader (Solución Definitiva de 3ra Gen)
 async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
+    const query = `${trackArtist} - ${trackName} audio`;
+
+    // NIVEL 1: Doble Proxy (Piped + Cobalt) - Lo más seguro contra bloqueos
+    log(`[3ra GEN] Intentando método Doble Proxy (Piped + Cobalt)...`);
+    const ytUrl = await fetchYouTubeUrl(query);
+    if (ytUrl) {
+        const success = await downloadWithCobalt(ytUrl, outputPath);
+        if (success) {
+            log(`[3ra GEN] ¡Éxito total! Descargado vía Doble Proxy.`);
+            return outputPath;
+        }
+    }
+
+    // NIVEL 2: APIs Directas (SpotifyDown, SpotiSong)
+    log(`[3ra GEN] Falló Doble Proxy. Intentando APIs directas...`);
     const apis = [
         // API 1: SpotifyDown.com
         async () => {
@@ -106,8 +181,7 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
         }
     }
 
-    log(`[API] Todas las APIs externas fallaron. Intentando fallback pesado (yt-dlp)...`);
-    const query = `${trackArtist} - ${trackName} audio`;
+    log(`[3ra GEN] Todas las APIs externas fallaron. Intentando fallback pesado (yt-dlp)...`);
     return await downloadAudioFallback(query, outputPath);
 }
 
