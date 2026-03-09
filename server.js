@@ -51,6 +51,41 @@ app.get('/', (req, res) => {
     res.send('Servidor de Xavi en línea y funcionando 24/7');
 });
 
+// ============================================================
+// ENDPOINT DE DIAGNÓSTICO TEMPORAL - Probar dlapi.app desde Render
+// Usa: GET /api/test-dlapi?id=SPOTIFY_TRACK_ID
+// ============================================================
+app.get('/api/test-dlapi', async (req, res) => {
+    const trackId = req.query.id || '7FxaIJrCTlq2mHhcIdq3pA';
+    const endpoints = [
+        `https://api.dlapi.app/spotify/track?id=${trackId}`,
+        `https://api.dlapi.app/spotify?id=${trackId}`,
+        `https://api.dlapi.app/track?id=${trackId}`,
+        `https://api.dlapi.app/download?url=https://open.spotify.com/track/${trackId}`,
+        `https://api.dlapi.app/api/spotify?id=${trackId}`,
+        `https://api.dlapi.app/spotify/download?id=${trackId}`
+    ];
+
+    const results = [];
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+    };
+
+    for (const url of endpoints) {
+        try {
+            const r = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+            const text = await r.text();
+            let json = null;
+            try { json = JSON.parse(text); } catch (e) { }
+            results.push({ url, status: r.status, response: json || text.substring(0, 300), hasDownload: !!(json?.data?.download || json?.link || json?.url) });
+        } catch (e) {
+            results.push({ url, error: e.message });
+        }
+    }
+    res.json({ trackId, results });
+});
+
 // Helper: Download Image
 async function downloadImage(url) {
     if (!url) return null;
