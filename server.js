@@ -106,35 +106,35 @@ async function downloadFile(url, outputPath) {
 
 // Helper: Download via dlapi.app (API confiable verificada)
 async function downloadWithDlapi(trackId, outputPath) {
-    // Posibles endpoints de dlapi.app (intentar varios para mayor resiliencia)
+    // NOTA: api.dlapi.app tarda >15s en responder desde Render, usar timeout de 60s
     const endpoints = [
         `https://api.dlapi.app/spotify/track?id=${trackId}`,
         `https://api.dlapi.app/spotify?trackid=${trackId}`,
-        `https://dlapi.app/api/spotify/track?id=${trackId}`
+        `https://api.dlapi.app/spotify?id=${trackId}`
     ];
 
     for (const url of endpoints) {
         try {
-            log(`[dlapi] Intentando: ${url}`);
+            log(`[dlapi] Intentando: ${url} (timeout: 60s)`);
             const res = await fetch(url, {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                     'Accept': 'application/json'
                 },
-                signal: AbortSignal.timeout(15000)
+                signal: AbortSignal.timeout(60000) // 60 segundos - la API es lenta pero responde
             });
 
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
 
             // Formato: { status: true, data: { download: '...', title: '...', author: '...' } }
-            const downloadUrl = data?.data?.download || data?.link || data?.url;
+            const downloadUrl = data?.data?.download || data?.link || data?.url || data?.download;
             if (downloadUrl) {
-                log(`[dlapi] ¡Link obtenido! Descargando desde: ${downloadUrl.substring(0, 60)}...`);
+                log(`[dlapi] ¡Link obtenido! Descargando MP3...`);
                 await downloadFile(downloadUrl, outputPath);
                 return true;
             }
-            throw new Error('Respuesta sin link de descarga: ' + JSON.stringify(data).substring(0, 100));
+            log(`[dlapi] Respuesta recibida pero sin link: ${JSON.stringify(data).substring(0, 150)}`);
         } catch (e) {
             log(`[dlapi Error] ${url}: ${e.message}`);
         }
