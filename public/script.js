@@ -111,6 +111,7 @@ async function downloadTrack() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                id: currentData.id,
                 name: currentData.name,
                 artist: currentData.artist,
                 image: currentData.image || ''

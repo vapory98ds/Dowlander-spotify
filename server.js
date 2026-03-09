@@ -60,11 +60,48 @@ async function downloadImage(url) {
     } catch (e) { return null; }
 }
 
-// Helper: Run yt-dlp via yt-dlp-exec
-async function downloadAudio(query, outputPath) {
-    try {
-        log(`Executing yt-dlp-exec for: ${query}`);
+// Helper: Download file from URL
+async function downloadFile(url, outputPath) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Fallo al descargar archivo: ${response.statusText}`);
+    const buffer = await response.buffer();
+    fs.writeFileSync(outputPath, buffer);
+    return outputPath;
+}
 
+// Helper: Run download via SpotifyDown API (Solución Definitiva para Render)
+async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
+    try {
+        log(`[API] Intentando descargar mediante SpotifyDown para ID: ${trackId}`);
+
+        const headers = {
+            'Origin': 'https://spotifydown.com',
+            'Referer': 'https://spotifydown.com/',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        };
+
+        const dlRes = await fetch(`https://api.spotifydown.com/download/${trackId}`, { headers });
+        const dlData = await dlRes.json();
+
+        if (!dlData.success || !dlData.link) {
+            throw new Error(dlData.message || 'La API de SpotifyDown no devolvió el link de descarga.');
+        }
+
+        log(`[API] Link obtenido con éxito, descargando...`);
+        await downloadFile(dlData.link, outputPath);
+        log(`[API] Descarga completada: ${outputPath}`);
+        return outputPath;
+    } catch (error) {
+        log(`[API] Error en SpotifyDown: ${error.message}. Intentando fallback local (yt-dlp)...`);
+        const query = `${trackArtist} - ${trackName} audio`;
+        return await downloadAudioFallback(query, outputPath);
+    }
+}
+
+// Fallback: yt-dlp (para local o si falla la API)
+async function downloadAudioFallback(query, outputPath) {
+    try {
+        log(`[Fallback] Ejecutando yt-dlp-exec para: ${query}`);
         const options = {
             extractAudio: true,
             audioFormat: 'mp3',
@@ -83,12 +120,8 @@ async function downloadAudio(query, outputPath) {
             ]
         };
 
-        // Si existe cookies.txt, usarlo para evadir el bloqueo de bot definitivamente
         const cookiesPath = path.join(__dirname, 'cookies.txt');
-        const exists = fs.existsSync(cookiesPath);
-        log(`Checking for cookies at: ${cookiesPath} - Exists: ${exists}`);
-
-        if (exists) {
+        if (fs.existsSync(cookiesPath)) {
             log('Using cookies.txt for authentication');
             options.cookies = cookiesPath;
         } else {
@@ -105,7 +138,7 @@ async function downloadAudio(query, outputPath) {
         }
     } catch (error) {
         log(`yt-dlp Error: ${error.message}`);
-        throw error;
+        throw new Error(`Ambos métodos fallaron. Error yt-dlp: ${error.message}`);
     }
 }
 
@@ -115,14 +148,14 @@ const trackSessions = {};
 // Endpoint: Start Track Download
 app.post('/api/start-track-download', async (req, res) => {
     try {
-        const { name, artist, image } = req.body;
-        if (!name || !artist) throw new Error('Missing name or artist');
+        const { id, name, artist, image } = req.body;
+        if (!id || !name || !artist) throw new Error('Missing track data (id, name, or artist)');
 
         const sessionId = 'trk_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-        log(`[Track] Starting session ${sessionId} for "${name}" by "${artist}"`);
+        log(`[Track] Starting session ${sessionId} for "${name}" by "${artist}" (ID: ${id})`);
 
         trackSessions[sessionId] = {
-            name, artist, image, status: 'downloading',
+            id, name, artist, image, status: 'downloading',
             filePath: null, error: null
         };
 
@@ -142,11 +175,10 @@ async function processTrack(sessionId) {
     if (!session) return;
 
     try {
-        const query = `${session.artist} - ${session.name} audio`;
         const safeName = session.name.replace(/[^a-z0-9]/gi, '_');
         const tempFile = path.join(TEMP_DIR, `${sessionId}_${safeName}.mp3`);
 
-        await downloadAudio(query, tempFile);
+        await downloadAudio(session.id, session.name, session.artist, tempFile);
 
         const cover = await downloadImage(session.image);
         NodeID3.write({ title: session.name, artist: session.artist, APIC: cover }, tempFile);
@@ -277,12 +309,11 @@ async function processAlbum(sessionId) {
     // Create download tasks
     const tasks = tracks.map((track, i) => {
         return async () => {
-            const query = `${track.artist} - ${track.name} audio`;
             const safeName = track.name.replace(/[^a-z0-9 ]/gi, '').trim();
             const tempFile = path.join(TEMP_DIR, `${sessionId}_${i}_${safeName}.mp3`);
 
-            log(`[Album ${sessionId}] Downloading ${i + 1}/${tracks.length}: ${track.name}`);
-            await downloadAudio(query, tempFile);
+            log(`[Album ${sessionId}] Downloading ${i + 1}/${tracks.length}: ${track.name} (ID: ${track.id})`);
+            await downloadAudio(track.id, track.name, track.artist, tempFile);
 
             NodeID3.write({
                 title: track.name,
@@ -410,13 +441,18 @@ app.get('/api/info', async (req, res) => {
         log(`[Info] Detected type: ${type}`);
 
         // Step 1: Get preview for basic info
-        let name = 'Unknown', artist = 'Unknown', image = '';
+        let name = 'Unknown', artist = 'Unknown', image = '', id = '';
         try {
             const preview = await getPreview(url);
             name = preview.title || 'Unknown';
             artist = preview.artist || preview.description || 'Unknown';
             image = preview.image || '';
-            log(`[Info] Preview OK: ${name} by ${artist}`);
+            // Extract ID from URL for single tracks
+            if (type === 'track') {
+                const parts = url.split('/');
+                id = parts[parts.length - 1].split('?')[0];
+            }
+            log(`[Info] Preview OK: ${name} by ${artist} (ID: ${id})`);
         } catch (previewErr) {
             log(`[Info] getPreview error: ${previewErr.message}`);
             console.error('getPreview error:', previewErr);
@@ -431,11 +467,16 @@ app.get('/api/info', async (req, res) => {
             try {
                 const trackList = await getTracks(url);
                 log(`[Info] getTracks returned ${trackList.length} tracks`);
-                tracks = trackList.map(t => ({
-                    name: t.name || 'Unknown',
-                    artist: t.artist || 'Unknown',
-                    image: image
-                }));
+                tracks = trackList.map(t => {
+                    // Extract ID from URI (spotify:track:ID)
+                    const trackId = t.uri ? t.uri.split(':').pop() : '';
+                    return {
+                        id: trackId,
+                        name: t.name || 'Unknown',
+                        artist: t.artist || 'Unknown',
+                        image: image
+                    };
+                });
             } catch (tracksErr) {
                 log(`[Info] getTracks failed: ${tracksErr.message}`);
                 console.error('getTracks error:', tracksErr);
@@ -448,11 +489,15 @@ app.get('/api/info', async (req, res) => {
                     const data = await getData(url);
                     const rawTracks = data.trackList || [];
                     log(`[Info] getData.trackList has ${rawTracks.length} items`);
-                    tracks = rawTracks.map(t => ({
-                        name: t.title || t.name || 'Unknown',
-                        artist: t.subtitle || artist || 'Unknown',
-                        image: image
-                    }));
+                    tracks = rawTracks.map(t => {
+                        const trackId = t.id || (t.uri ? t.uri.split(':').pop() : '');
+                        return {
+                            id: trackId,
+                            name: t.title || t.name || 'Unknown',
+                            artist: t.subtitle || artist || 'Unknown',
+                            image: image
+                        };
+                    });
                 } catch (dataErr) {
                     log(`[Info] getData fallback failed: ${dataErr.message}`);
                     console.error('getData error:', dataErr);
@@ -460,7 +505,7 @@ app.get('/api/info', async (req, res) => {
             }
         }
 
-        const result = { type, name, artist, image, tracks };
+        const result = { type, name, artist, image, id, tracks };
         log(`[Info] Returning: type=${type}, name=${name}, tracks=${tracks.length}`);
         res.json(result);
     } catch (e) {
