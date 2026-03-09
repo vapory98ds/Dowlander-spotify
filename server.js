@@ -60,41 +60,51 @@ async function downloadImage(url) {
     } catch (e) { return null; }
 }
 
-// Motor principal de descarga - SOLO SOUNDCLOUD (Más rápido y sin bloqueos en Render)
+// Motor principal de descarga - MODO TURBO 2.0 (SoundCloud + Audiomack)
 async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
     const query = `${trackArtist} - ${trackName}`;
+    const baseOptions = {
+        extractAudio: true,
+        audioFormat: 'mp3',
+        audioQuality: 0,
+        ffmpegLocation: path.dirname(ffmpegPath),
+        output: outputPath,
+        noCheckCertificates: true,
+        noWarnings: true,
+        preferFreeFormats: true,
+        noPlaylist: true,
+        concurrentFragments: 15, // TURBO 2.0: 15 hilos simultáneos
+        noCacheDir: true,
+        addHeader: [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        ]
+    };
+
+    // INTENTO 1: SoundCloud (Prioridad 1)
     try {
-        log(`[SoundCloud] Buscando y descargando: ${query}`);
-
-        const options = {
-            extractAudio: true,
-            audioFormat: 'mp3',
-            audioQuality: 0,
-            ffmpegLocation: path.dirname(ffmpegPath),
-            output: outputPath,
-            noCheckCertificates: true,
-            noWarnings: true,
-            preferFreeFormats: true,
-            noPlaylist: true,
-            concurrentFragments: 10, // Turbo: 10 hilos de descarga simultánea
-            noCacheDir: true,
-            addHeader: [
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-            ]
-        };
-
-        // Búsqueda directa en SoundCloud (scsearch1)
-        await ytDlp(`scsearch1:${query}`, options);
-
+        log(`[Turbo 2.0] Buscando en SoundCloud: ${query}`);
+        await ytDlp(`scsearch1:${query}`, baseOptions);
         if (fs.existsSync(outputPath)) {
-            log(`[Éxito] Descargado desde SoundCloud: ${outputPath}`);
+            log(`[Éxito SC] Descargado desde SoundCloud`);
             return outputPath;
         }
-        throw new Error('El archivo no se generó tras la descarga.');
-    } catch (error) {
-        log(`[SC Error] ${error.message}`);
-        throw new Error(`Fallo al descargar desde SoundCloud: ${error.message}`);
+    } catch (e) {
+        log(`[SC Skip] No encontrado o error: ${e.message.substring(0, 50)}`);
     }
+
+    // INTENTO 2: Audiomack (Respaldo Turbo)
+    try {
+        log(`[Turbo 2.0] Buscando en Audiomack: ${query}`);
+        await ytDlp(`audiomacksearch1:${query}`, baseOptions);
+        if (fs.existsSync(outputPath)) {
+            log(`[Éxito AM] Descargado desde Audiomack`);
+            return outputPath;
+        }
+    } catch (e) {
+        log(`[AM Error] ${e.message.substring(0, 50)}`);
+    }
+
+    throw new Error('No se encontró la pista en SoundCloud ni Audiomack.');
 }
 
 // Track download sessions (in-memory)
