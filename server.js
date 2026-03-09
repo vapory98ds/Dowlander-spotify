@@ -76,6 +76,8 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
             noWarnings: true,
             preferFreeFormats: true,
             noPlaylist: true,
+            concurrentFragments: 5,
+            noCacheDir: true,
             addHeader: [
                 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
             ]
@@ -281,8 +283,8 @@ async function processAlbum(sessionId) {
         };
     });
 
-    // Run 2 concurrent downloads
-    await downloadParallel(tasks, 2, (idx, success, errMsg) => {
+    // Run 3 concurrent downloads (Optimized for Render)
+    await downloadParallel(tasks, 3, (idx, success, errMsg) => {
         session.completed++;
         session.progress.push({
             index: idx,
@@ -298,7 +300,7 @@ async function processAlbum(sessionId) {
         const zipPath = path.join(TEMP_DIR, `${sessionId}_${folderName}.zip`);
         await new Promise((resolve, reject) => {
             const output = fs.createWriteStream(zipPath);
-            const archive = archiver('zip', { zlib: { level: 6 } }); // level 6 for speed
+            const archive = archiver('zip', { zlib: { level: 1 } }); // Level 1 is much faster than 6
 
             output.on('close', resolve);
             archive.on('error', reject);
