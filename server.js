@@ -11,7 +11,7 @@ const { execFile } = require('child_process');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const YTDLP_PATH = path.join(__dirname, 'yt-dlp.exe');
 const LOG_FILE = path.join(__dirname, 'server_debug.log');
 
@@ -42,6 +42,14 @@ app.use(express.json());
 app.use((req, res, next) => {
     log(`[Incoming] ${req.method} ${req.url}`);
     next();
+});
+
+// Ruta base para UptimeRobot (evitar que la app se duerma en Render)
+app.get('/ping', (req, res) => {
+    res.send('Servidor de Xavi M. online 24/7 ✅');
+});
+app.get('/', (req, res) => {
+    res.send('Servidor de Xavi en línea y funcionando 24/7');
 });
 
 // Helper: Download Image
