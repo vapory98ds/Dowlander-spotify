@@ -69,48 +69,57 @@ async function downloadFile(url, outputPath) {
     return outputPath;
 }
 
-// Helper: Run download via SpotifyDown API (Solución Definitiva para Render)
+// Helper: Multi-API Audio Downloader (Solución Definitiva)
 async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
-    try {
-        log(`[API] Intentando descargar mediante SpotifyDown para ID: ${trackId}`);
-
-        const headers = {
-            'Origin': 'https://spotifydown.com',
-            'Referer': 'https://spotifydown.com/',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        };
-
-        const dlRes = await fetch(`https://api.spotifydown.com/download/${trackId}`, { headers });
-        const dlData = await dlRes.json();
-
-        if (!dlData.success || !dlData.link) {
-            throw new Error(dlData.message || 'La API de SpotifyDown no devolvió el link de descarga.');
+    const apis = [
+        // API 1: SpotifyDown.com
+        async () => {
+            log(`[API 1] Probando SpotifyDown para ID: ${trackId}`);
+            const headers = {
+                'Origin': 'https://spotifydown.com',
+                'Referer': 'https://spotifydown.com/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            };
+            const res = await fetch(`https://api.spotifydown.com/download/${trackId}`, { headers });
+            const data = await res.json();
+            if (data.success && data.link) return data.link;
+            throw new Error(data.message || 'No se obtuvo link');
+        },
+        // API 2: SpotiSongDownloader (Fallback)
+        async () => {
+            log(`[API 2] Probando SpotiSong para ID: ${trackId}`);
+            const res = await fetch(`https://api.spotisongdownloader.com/api/composer/spotify/track/${trackId}`);
+            const data = await res.json();
+            if (data.download_url) return data.download_url;
+            throw new Error('No se obtuvo link de SpotiSong');
         }
+    ];
 
-        log(`[API] Link obtenido con éxito, descargando...`);
-        await downloadFile(dlData.link, outputPath);
-        log(`[API] Descarga completada: ${outputPath}`);
-        return outputPath;
-    } catch (error) {
-        log(`[API] Error en SpotifyDown: ${error.message}. Intentando fallback local (yt-dlp)...`);
-        const query = `${trackArtist} - ${trackName} audio`;
-        return await downloadAudioFallback(query, outputPath);
+    for (let i = 0; i < apis.length; i++) {
+        try {
+            const downloadUrl = await apis[i]();
+            log(`[API] Link obtenido con éxito (API ${i + 1}), descargando...`);
+            await downloadFile(downloadUrl, outputPath);
+            return outputPath;
+        } catch (e) {
+            log(`[API ${i + 1}] Falló: ${e.message}`);
+        }
     }
+
+    log(`[API] Todas las APIs externas fallaron. Intentando fallback pesado (yt-dlp)...`);
+    const query = `${trackArtist} - ${trackName} audio`;
+    return await downloadAudioFallback(query, outputPath);
 }
 
-// Fallback: yt-dlp (para local o si falla la API)
+// Fallback: yt-dlp (para local o si fallan las APIs externas)
 async function downloadAudioFallback(query, outputPath) {
     try {
-        log(`[Fallback] Ejecutando yt-dlp-exec para: ${query}`);
+        log(`[Fallback] Ejecutando yt-dlp para: ${query}`);
         const options = {
-            extractAudio: true,
-            audioFormat: 'mp3',
-            audioQuality: 0,
+            extractAudio: true, audioFormat: 'mp3', audioQuality: 0,
             ffmpegLocation: path.dirname(ffmpegPath),
             output: outputPath,
-            noCheckCertificates: true,
-            noWarnings: true,
-            preferFreeFormats: true,
+            noCheckCertificates: true, noWarnings: true, preferFreeFormats: true,
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             addHeader: [
                 'Accept-Language: es-ES,es;q=0.9,en;q=0.8',
@@ -120,25 +129,36 @@ async function downloadAudioFallback(query, outputPath) {
             ]
         };
 
-        const cookiesPath = path.join(__dirname, 'cookies.txt');
-        if (fs.existsSync(cookiesPath)) {
-            log('Using cookies.txt for authentication');
-            options.cookies = cookiesPath;
-        } else {
-            log('No cookies.txt found, proceeding with headers only');
+        // Buscar cookies en raíz o en docs/ (donde parece que las puso el usuario)
+        const possibleCookiePaths = [
+            path.join(__dirname, 'cookies.txt'),
+            path.join(__dirname, 'docs', 'www.youtube.com_cookies.txt'),
+            path.join(__dirname, 'docs', 'cookies.txt')
+        ];
+
+        let cookiesFound = false;
+        for (const p of possibleCookiePaths) {
+            if (fs.existsSync(p)) {
+                log(`[Cookies] Usando archivo encontrado en: ${p}`);
+                options.cookies = p;
+                cookiesFound = true;
+                break;
+            }
         }
+
+        if (!cookiesFound) log('[Cookies] No se detectó archivo cookies.txt en ninguna ubicación conocida.');
 
         await ytDlp(`ytsearch1:${query}`, options);
 
         if (fs.existsSync(outputPath)) {
-            log(`Success: File created at ${outputPath}`);
+            log(`[Éxito] Archivo creado: ${outputPath}`);
             return outputPath;
         } else {
-            throw new Error('yt-dlp sub-process completed but output file is missing.');
+            throw new Error('yt-dlp terminó pero el archivo no aparece.');
         }
     } catch (error) {
-        log(`yt-dlp Error: ${error.message}`);
-        throw new Error(`Ambos métodos fallaron. Error yt-dlp: ${error.message}`);
+        log(`[Error Fallback] ${error.message}`);
+        throw new Error(`Fallo total: APIs externas y YouTube (yt-dlp) fallaron.`);
     }
 }
 
