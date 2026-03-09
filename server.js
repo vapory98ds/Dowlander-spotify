@@ -87,38 +87,99 @@ async function downloadAudio(query, outputPath) {
     }
 }
 
-// Endpoint: Download Track
-app.get('/api/download-track', async (req, res) => {
-    let tempFile = null;
-    try {
-        log(`[Request Handler] ${req.url}`);
-        const { name, artist, image } = req.query;
+// Track download sessions (in-memory)
+const trackSessions = {};
 
+// Endpoint: Start Track Download
+app.post('/api/start-track-download', async (req, res) => {
+    try {
+        const { name, artist, image } = req.body;
         if (!name || !artist) throw new Error('Missing name or artist');
 
-        const query = `${artist} - ${name} audio`;
-        const safeName = name.replace(/[^a-z0-9]/gi, '_');
-        tempFile = path.join(TEMP_DIR, `${Date.now()}_${safeName}.mp3`);
+        const sessionId = 'trk_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        log(`[Track] Starting session ${sessionId} for "${name}" by "${artist}"`);
+
+        trackSessions[sessionId] = {
+            name, artist, image, status: 'downloading',
+            filePath: null, error: null
+        };
+
+        // Start processing in background
+        processTrack(sessionId);
+
+        res.json({ sessionId });
+    } catch (e) {
+        log(`Track Start Error: ${e.message}`);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Background track processing
+async function processTrack(sessionId) {
+    const session = trackSessions[sessionId];
+    if (!session) return;
+
+    try {
+        const query = `${session.artist} - ${session.name} audio`;
+        const safeName = session.name.replace(/[^a-z0-9]/gi, '_');
+        const tempFile = path.join(TEMP_DIR, `${sessionId}_${safeName}.mp3`);
 
         await downloadAudio(query, tempFile);
 
-        const cover = await downloadImage(image);
-        NodeID3.write({ title: name, artist, APIC: cover }, tempFile);
+        const cover = await downloadImage(session.image);
+        NodeID3.write({ title: session.name, artist: session.artist, APIC: cover }, tempFile);
 
-        log(`Sending file: ${tempFile}`);
-        res.download(tempFile, `${name}.mp3`, (err) => {
-            if (err) log(`Send Error: ${err.message}`);
-            // Delayed cleanup
-            setTimeout(() => {
-                try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch (e) { }
-            }, 5000);
-        });
+        session.filePath = tempFile;
+        session.status = 'done';
+        log(`[Track] ${sessionId} Ready`);
     } catch (e) {
-        log(`Track Error: ${e.message}`);
-        // Clean up
-        if (tempFile && fs.existsSync(tempFile)) try { fs.unlinkSync(tempFile); } catch (e) { }
-        res.status(500).send(`Server Error: ${e.message}`);
+        session.error = e.message;
+        session.status = 'error';
+        log(`[Track] ${sessionId} Error: ${e.message}`);
     }
+}
+
+// SSE: Track Progress Stream
+app.get('/api/track-progress/:sessionId', (req, res) => {
+    const { sessionId } = req.params;
+    const session = trackSessions[sessionId];
+
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+    });
+
+    const interval = setInterval(() => {
+        if (session.status === 'done' || session.status === 'error') {
+            res.write(`data: ${JSON.stringify({ status: session.status, error: session.error })}\n\n`);
+            clearInterval(interval);
+            res.end();
+        } else {
+            // Heartbeat against Render's 100s timeout
+            res.write(`data: ${JSON.stringify({ status: 'downloading' })}\n\n`);
+        }
+    }, 1500);
+
+    req.on('close', () => clearInterval(interval));
+});
+
+// Download the generated track
+app.get('/api/download-track-file/:sessionId', (req, res) => {
+    const { sessionId } = req.params;
+    const session = trackSessions[sessionId];
+
+    if (!session || session.status !== 'done') return res.status(404).send('File not ready');
+
+    res.download(session.filePath, `${session.name}.mp3`, (err) => {
+        setTimeout(() => {
+            try { if (fs.existsSync(session.filePath)) fs.unlinkSync(session.filePath); } catch (e) { }
+            delete trackSessions[sessionId];
+        }, 5000);
+    });
 });
 
 // Album download sessions (in-memory)

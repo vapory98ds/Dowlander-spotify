@@ -103,21 +103,65 @@ async function startDownload() {
 
 async function downloadTrack() {
     const statusMsg = document.getElementById('statusMsg');
-    statusMsg.innerText = "⏳ Descargando canción... (30-60 segundos)";
+    statusMsg.innerText = "⏳ Inicializando descarga...";
+    statusMsg.className = 'status';
 
-    const endpoint = `/api/download-track?name=${encodeURIComponent(currentData.name)}&artist=${encodeURIComponent(currentData.artist)}&image=${encodeURIComponent(currentData.image || '')}`;
+    try {
+        const startResponse = await fetch(`${API_BASE}/api/start-track-download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: currentData.name,
+                artist: currentData.artist,
+                image: currentData.image || ''
+            })
+        });
 
-    const response = await fetch(`${API_BASE}${endpoint}`);
+        if (!startResponse.ok) {
+            const errText = await startResponse.text();
+            throw new Error(`Error al iniciar descarga: ${errText}`);
+        }
 
-    if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Server Error (${response.status}): ${errText}`);
+        const { sessionId } = await startResponse.json();
+        statusMsg.innerText = "🎶 Descargando y procesando audio (no cierres esta ventana, suele tardar unos minutos)...";
+
+        // Listen for progress via SSE
+        await new Promise((resolve, reject) => {
+            const eventSource = new EventSource(`${API_BASE}/api/track-progress/${sessionId}`);
+
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.status === 'done') {
+                    eventSource.close();
+                    resolve();
+                } else if (data.status === 'error') {
+                    eventSource.close();
+                    reject(new Error(data.error || 'Error procesando pista'));
+                }
+            };
+
+            eventSource.onerror = () => {
+                eventSource.close();
+                reject(new Error('Conexión perdida con el servidor de descargas'));
+            };
+        });
+
+        statusMsg.innerText = "✅ ¡Listo! Descargando archivo a tu dispositivo...";
+
+        const fileResponse = await fetch(`${API_BASE}/api/download-track-file/${sessionId}`);
+        if (!fileResponse.ok) throw new Error('Error al obtener el MP3 final');
+
+        const blob = await fileResponse.blob();
+        triggerDownload(blob, `${currentData.name}.mp3`);
+
+        statusMsg.innerText = "✅ ¡Canción descargada con éxito!";
+        statusMsg.className = 'status success';
+    } catch (e) {
+        console.error(e);
+        statusMsg.innerText = "Error: " + e.message;
+        statusMsg.className = 'status error';
     }
-
-    const blob = await response.blob();
-    triggerDownload(blob, `${currentData.name}.mp3`);
-    statusMsg.innerText = "✅ ¡Canción descargada!";
-    statusMsg.className = 'status success';
 }
 
 async function downloadAlbum() {
