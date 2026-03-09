@@ -64,7 +64,8 @@ async function downloadImage(url) {
 async function downloadAudio(query, outputPath) {
     try {
         log(`Executing yt-dlp-exec for: ${query}`);
-        await ytDlp(`ytsearch1:${query}`, {
+
+        const options = {
             extractAudio: true,
             audioFormat: 'mp3',
             audioQuality: 0,
@@ -73,7 +74,6 @@ async function downloadAudio(query, outputPath) {
             noCheckCertificates: true,
             noWarnings: true,
             preferFreeFormats: true,
-            // Evasión de bloqueo de bots
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             addHeader: [
                 'Accept-Language: es-ES,es;q=0.9,en;q=0.8',
@@ -81,7 +81,18 @@ async function downloadAudio(query, outputPath) {
                 'Sec-Ch-Ua-Mobile: ?0',
                 'Sec-Ch-Ua-Platform: "Windows"'
             ]
-        });
+        };
+
+        // Si existe cookies.txt, usarlo para evadir el bloqueo de bot definitivamente
+        const cookiesPath = path.join(__dirname, 'cookies.txt');
+        if (fs.existsSync(cookiesPath)) {
+            log('Using cookies.txt for authentication');
+            options.cookies = cookiesPath;
+        } else {
+            log('No cookies.txt found, proceeding with headers only');
+        }
+
+        await ytDlp(`ytsearch1:${query}`, options);
 
         if (fs.existsSync(outputPath)) {
             log(`Success: File created at ${outputPath}`);
