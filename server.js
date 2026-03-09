@@ -69,24 +69,39 @@ async function downloadFile(url, outputPath) {
     return outputPath;
 }
 
-// Helper: Fetch YouTube URL from Piped (Proxy Search)
+// Helper: Fetch YouTube URL from Piped/Invidious (Proxy Search)
 async function fetchYouTubeUrl(query) {
-    try {
-        log(`[Piped] Buscando video para: ${query}`);
-        const res = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=videos`);
-        const data = await res.json();
+    const pipedInstances = [
+        'https://pipedapi.adminforge.de',
+        'https://pipedapi.darkness.services',
+        'https://pipedapi.kavin.rocks',
+        'https://piped-api.garudalinux.org'
+    ];
 
-        if (data.items && data.items.length > 0) {
-            const videoId = data.items[0].url.split('v=')[1];
-            const url = `https://www.youtube.com/watch?v=${videoId}`;
-            log(`[Piped] Video encontrado: ${url}`);
-            return url;
+    for (const base of pipedInstances) {
+        try {
+            log(`[Piped] Buscando en ${base}...`);
+            const res = await fetch(`${base}/search?q=${encodeURIComponent(query)}&filter=videos`, {
+                signal: AbortSignal.timeout(8000)
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const text = await res.text();
+            const data = JSON.parse(text);
+
+            if (data.items && data.items.length > 0) {
+                const item = data.items[0];
+                const videoId = (item.url || '').replace('/watch?v=', '');
+                const url = `https://www.youtube.com/watch?v=${videoId}`;
+                log(`[Piped] Video encontrado: ${url}`);
+                return url;
+            }
+        } catch (e) {
+            log(`[Piped Error] ${base}: ${e.message}`);
         }
-        throw new Error('No se encontraron videos en Piped');
-    } catch (e) {
-        log(`[Piped Error] ${e.message}`);
-        return null;
     }
+
+    log('[Piped] Todas las instancias fallaron.');
+    return null;
 }
 
 // Helper: Download via Cobalt Instance (Proxy Download)
@@ -189,47 +204,42 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
 async function downloadAudioFallback(query, outputPath) {
     try {
         log(`[Fallback] Ejecutando yt-dlp para: ${query}`);
+
+        // IMPORTANTE: No usar la clave 'userAgent' del objeto de opciones de yt-dlp-exec
+        // ya que genera '---user-agent' (con triple guion). En su lugar se usa addHeader.
         const options = {
             extractAudio: true, audioFormat: 'mp3', audioQuality: 0,
             ffmpegLocation: path.dirname(ffmpegPath),
             output: outputPath,
             noCheckCertificates: true, noWarnings: true, preferFreeFormats: true,
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             addHeader: [
-                'Accept-Language: es-ES,es;q=0.9,en;q=0.8',
-                'Sec-Ch-Ua: "Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-                'Sec-Ch-Ua-Mobile: ?0',
-                'Sec-Ch-Ua-Platform: "Windows"'
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept-Language: es-ES,es;q=0.9,en;q=0.8'
             ]
         };
 
-        // Buscar cookies en raíz o en docs/ (donde parece que las puso el usuario)
+        // Buscar cookies en raíz o en docs/
         const possibleCookiePaths = [
             path.join(__dirname, 'cookies.txt'),
             path.join(__dirname, 'docs', 'www.youtube.com_cookies.txt'),
             path.join(__dirname, 'docs', 'cookies.txt')
         ];
 
-        let cookiesFound = false;
         for (const p of possibleCookiePaths) {
             if (fs.existsSync(p)) {
-                log(`[Cookies] Usando archivo encontrado en: ${p}`);
+                log(`[Cookies] Usando: ${p}`);
                 options.cookies = p;
-                cookiesFound = true;
                 break;
             }
         }
-
-        if (!cookiesFound) log('[Cookies] No se detectó archivo cookies.txt en ninguna ubicación conocida.');
 
         await ytDlp(`ytsearch1:${query}`, options);
 
         if (fs.existsSync(outputPath)) {
             log(`[Éxito] Archivo creado: ${outputPath}`);
             return outputPath;
-        } else {
-            throw new Error('yt-dlp terminó pero el archivo no aparece.');
         }
+        throw new Error('yt-dlp terminó pero el archivo no aparece.');
     } catch (error) {
         log(`[Error Fallback] ${error.message}`);
         throw new Error(`Fallo total: APIs externas y YouTube (yt-dlp) fallaron.`);
