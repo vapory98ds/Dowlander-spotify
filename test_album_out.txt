@@ -1,0 +1,54 @@
+﻿=== Testing getPreview ===
+Preview: {
+  "title": "Proa├▒o",
+  "type": "album",
+  "track": "Argentum",
+  "description": "Enjambre",
+  "artist": "Enjambre",
+  "image": "https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b27326da2f3b75f84c4c1d10730a",
+  "audio": "https://p.scdn.co/mp3-preview/416444aa683433a5428c07703780923b90a0f394",
+  "link": "https://open.spotify.com/album/0M56ul1MNAOoEvW6tvpar4",
+  "embed": "https://embed.spotify.com/?uri=spotify:album:0M56ul1MNAOoEvW6tvpar4"
+}
+
+=== Testing getTracks ===
+getTracks returned 14 tracks
+First track: {
+  "artist": "Enjambre",
+  "duration": 233786,
+  "name": "Argentum",
+  "previewUrl": "https://p.scdn.co/mp3-preview/416444aa683433a5428c07703780923b90a0f394",
+  "uri": "spotify:track:5sXBDrSt8wMPnNTRGnCLqu"
+}
+Track keys: [ 'artist', 'duration', 'name', 'previewUrl', 'uri' ]
+
+=== Testing getData ===
+Type: album
+Name: Proa├▒o
+Top keys: [
+  'type',              'name',
+  'uri',               'id',
+  'title',             'subtitle',
+  'isPreRelease',      'releaseDate',
+  'duration',          'isPlayable',
+  'playabilityReason', 'isExplicit',
+  'hasVideo',          'relatedEntityUri',
+  'trackList',         'visualIdentity'
+]
+trackList: 14 items
+First: {
+  "uri": "spotify:track:5sXBDrSt8wMPnNTRGnCLqu",
+  "uid": "2aa67f205ff4f848969c",
+  "title": "Argentum",
+  "subtitle": "Enjambre",
+  "isExplicit": false,
+  "isNineteenPlus": false,
+  "duration": 233786,
+  "isPlayable": true,
+  "playabilityReason": "PLAYABLE",
+  "audioPreview": {
+    "format": "MP3_96",
+    "url": "https://p.scdn.co/mp3-preview/416444aa683433a5428c07703780923b90a0f394"
+  },
+  "entityType": "track"
+}

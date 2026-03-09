@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spotify Premium Downloader</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Partículas animadas de fondo -->
+    <div class="particles" id="particles"></div>
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+    <div class="ambient-glow glow-3"></div>
+
+    <!-- Perfil de GitHub Mejorado -->
+    <a href="https://github.com/vapory98ds" target="_blank" class="github-profile-float">
+        <div class="img-wrapper">
+            <img src="https://github.com/vapory98ds.png" alt="Xavi Sontay">
+            <div class="pulse-ring"></div>
+        </div>
+        <div class="github-info-float">
+            <span class="created-by">CREADO POR</span>
+            <span class="github-name-float">Xavi Sontay</span>
+        </div>
+        <i class="fab fa-github github-icon"></i>
+    </a>
+
+    <div class="main-container">
+        <!-- Header con animación de entrada -->
+        <header class="app-header">
+            <div class="logo-wrapper">
+                <i class="fab fa-spotify spotify-icon"></i>
+            </div>
+            <h1 class="main-title">Spotify <span class="text-gradient">Downloader</span></h1>
+            <p class="subtitle">Descarga música en máxima calidad al instante.</p>
+        </header>
+
+        <!-- Barra de búsqueda avanzada -->
+        <div class="search-container">
+            <div class="search-pill">
+                <i class="fas fa-link search-icon"></i>
+                <input type="url" id="urlInput" placeholder="Pega el enlace de Spotify aquí..." autocomplete="off">
+                <button onclick="fetchInfo()" id="searchBtn" class="btn-search">
+                    <i class="fas fa-search btn-icon"></i> Buscar
+                </button>
+            </div>
+        </div>
+
+        <!-- Loader premium -->
+        <div id="loader" class="loader-container hidden">
+            <div class="sound-wave">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+            <p>Analizando enlace...</p>
+        </div>
+
+        <!-- Tarjeta de Resultados Avanzada -->
+        <div id="resultCard" class="result-card hidden">
+            <div class="card-glass-bg"></div>
+
+            <div class="media-header">
+                <div class="art-container">
+                    <img id="albumArt" src="" alt="Portada">
+                    <div class="art-overlay"><i class="fas fa-music overlay-icon"></i></div>
+                </div>
+                <div class="media-details">
+                    <span id="typeBadge" class="media-badge"><i class="fas fa-compact-disc"></i> TRACK</span>
+                    <h2 id="trackTitle" class="media-title">Título de la Canción</h2>
+                    <h3 id="artistName" class="media-artist">Artista</h3>
+                </div>
+            </div>
+
+            <!-- Lista de Canciones Estilizada -->
+            <div id="trackListContainer" class="tracks-container hidden">
+                <div class="tracks-header">
+                    <h4><i class="fas fa-list-ul"></i> Lista de Reproducción (<span id="trackCount"
+                            class="text-gradient">0</span>)</h4>
+                </div>
+                <div class="tracks-scroll-area">
+                    <ul id="trackList" class="track-list-modern">
+                        <!-- JS populate -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Progreso Moderno -->
+            <div id="progressContainer" class="progress-wrapper hidden">
+                <div class="progress-info">
+                    <span id="progressText"><i class="fas fa-cloud-download-alt"></i> Preparando descarga...</span>
+                    <span id="progressPercent" class="text-gradient">0%</span>
+                </div>
+                <div class="track-progress">
+                    <div id="progressFill" class="track-progress-fill">
+                        <div class="progress-glow"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controles de Acción -->
+            <div class="action-controls">
+                <button id="downloadBtn" class="btn-download" onclick="startDownload()">
+                    <span class="btn-text">Descargar</span>
+                    <i class="fas fa-arrow-down btn-icon-right"></i>
+                </button>
+            </div>
+
+            <!-- Notificación de Estado -->
+            <div class="status-indicator">
+                <p id="statusMsg" class="status-msg"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer minimalista -->
+    <footer class="app-footer">
+        <p>&copy; 2026 Diseñado y desarrollado por <a href="https://github.com/vapory98ds" target="_blank"
+                class="footer-link">Xavi Sontay</a></p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+        // Generador de partículas pequeñas
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 30; i++) {
+            const particle = document.createElement('div');
+            particle.classList.add('particle');
+            particle.style.left = Math.random() * 100 + 'vw';
+            particle.style.animationDuration = (Math.random() * 15 + 10) + 's';
+            particle.style.animationDelay = (Math.random() * 5) + 's';
+            particlesContainer.appendChild(particle);
+        }
+    </script>
+</body>
+
+</html>
