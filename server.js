@@ -159,50 +159,81 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
     return await downloadAudioFallback(query, outputPath);
 }
 
-// Fallback: yt-dlp (para local o si fallan las APIs externas)
+// Fallback: yt-dlp con cliente iOS (no requiere PO Token) + SoundCloud
 async function downloadAudioFallback(query, outputPath) {
-    try {
-        log(`[Fallback] Ejecutando yt-dlp para: ${query}`);
-
-        // IMPORTANTE: No usar la clave 'userAgent' del objeto de opciones de yt-dlp-exec
-        // ya que genera '---user-agent' (con triple guion). En su lugar se usa addHeader.
-        const options = {
-            extractAudio: true, audioFormat: 'mp3', audioQuality: 0,
-            ffmpegLocation: path.dirname(ffmpegPath),
-            output: outputPath,
-            noCheckCertificates: true, noWarnings: true, preferFreeFormats: true,
-            addHeader: [
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept-Language: es-ES,es;q=0.9,en;q=0.8'
-            ]
-        };
-
-        // Buscar cookies en raíz o en docs/
-        const possibleCookiePaths = [
+    const cookiesPath = (() => {
+        const paths = [
             path.join(__dirname, 'cookies.txt'),
             path.join(__dirname, 'docs', 'www.youtube.com_cookies.txt'),
             path.join(__dirname, 'docs', 'cookies.txt')
         ];
+        for (const p of paths) { if (fs.existsSync(p)) return p; }
+        return null;
+    })();
 
-        for (const p of possibleCookiePaths) {
-            if (fs.existsSync(p)) {
-                log(`[Cookies] Usando: ${p}`);
-                options.cookies = p;
-                break;
-            }
-        }
+    if (cookiesPath) log(`[Cookies] Usando: ${cookiesPath}`);
+    else log('[Cookies] Sin cookies');
 
-        await ytDlp(`ytsearch1:${query}`, options);
+    const baseOpts = {
+        extractAudio: true, audioFormat: 'mp3', audioQuality: 0,
+        ffmpegLocation: path.dirname(ffmpegPath),
+        output: outputPath,
+        noCheckCertificates: true, noWarnings: true, preferFreeFormats: true,
+        addHeader: [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept-Language: es-ES,es;q=0.9,en;q=0.8'
+        ]
+    };
+    if (cookiesPath) baseOpts.cookies = cookiesPath;
 
+    // INTENTO 1: SoundCloud (no bloquea IPs de datacenter)
+    try {
+        log(`[SC] Buscando en SoundCloud: ${query}`);
+        const scOpts = { ...baseOpts, noPlaylist: true };
+        await ytDlp(`scsearch1:${query}`, scOpts);
         if (fs.existsSync(outputPath)) {
-            log(`[Éxito] Archivo creado: ${outputPath}`);
+            log('[SC] ¡Éxito! Descargado desde SoundCloud');
             return outputPath;
         }
-        throw new Error('yt-dlp terminó pero el archivo no aparece.');
-    } catch (error) {
-        log(`[Error Fallback] ${error.message}`);
-        throw new Error(`Fallo total: APIs externas y YouTube (yt-dlp) fallaron.`);
+    } catch (e) {
+        log(`[SC Error] ${e.message.substring(0, 120)}`);
     }
+
+    // INTENTO 2: YouTube con cliente iOS (no requiere PO Token desde datacenter)
+    try {
+        log(`[YT-iOS] Intentando YouTube con cliente iOS...`);
+        const iosOpts = {
+            ...baseOpts,
+            extractorArgs: 'youtube:player_client=ios',
+            noPlaylist: true
+        };
+        await ytDlp(`ytsearch1:${query}`, iosOpts);
+        if (fs.existsSync(outputPath)) {
+            log('[YT-iOS] ¡Éxito! Descargado desde YouTube vía cliente iOS');
+            return outputPath;
+        }
+    } catch (e) {
+        log(`[YT-iOS Error] ${e.message.substring(0, 120)}`);
+    }
+
+    // INTENTO 3: YouTube con cliente TV Embedded (alternativa)
+    try {
+        log(`[YT-TV] Intentando YouTube con cliente TV Embedded...`);
+        const tvOpts = {
+            ...baseOpts,
+            extractorArgs: 'youtube:player_client=tv_embedded',
+            noPlaylist: true
+        };
+        await ytDlp(`ytsearch1:${query}`, tvOpts);
+        if (fs.existsSync(outputPath)) {
+            log('[YT-TV] ¡Éxito! Descargado desde YouTube vía TV Embedded');
+            return outputPath;
+        }
+    } catch (e) {
+        log(`[YT-TV Error] ${e.message.substring(0, 120)}`);
+    }
+
+    throw new Error('Todos los métodos fallaron: SoundCloud, iOS y TV Embedded');
 }
 
 // Track download sessions (in-memory)
