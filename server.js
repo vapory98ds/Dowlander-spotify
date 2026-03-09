@@ -76,7 +76,7 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
             noWarnings: true,
             preferFreeFormats: true,
             noPlaylist: true,
-            concurrentFragments: 5,
+            concurrentFragments: 10, // Turbo: 10 hilos de descarga simultánea
             noCacheDir: true,
             addHeader: [
                 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
@@ -133,9 +133,12 @@ async function processTrack(sessionId) {
         const safeName = session.name.replace(/[^a-z0-9]/gi, '_');
         const tempFile = path.join(TEMP_DIR, `${sessionId}_${safeName}.mp3`);
 
-        await downloadAudio(session.id, session.name, session.artist, tempFile);
+        // TURBO: Descarga audio e imagen en paralelo
+        const [audioPath, cover] = await Promise.all([
+            downloadAudio(session.id, session.name, session.artist, tempFile),
+            downloadImage(session.image)
+        ]);
 
-        const cover = await downloadImage(session.image);
         NodeID3.write({ title: session.name, artist: session.artist, APIC: cover }, tempFile);
 
         session.filePath = tempFile;
@@ -283,8 +286,8 @@ async function processAlbum(sessionId) {
         };
     });
 
-    // Run 3 concurrent downloads (Optimized for Render)
-    await downloadParallel(tasks, 3, (idx, success, errMsg) => {
+    // TURBO: 5 descargas simultáneas (Límite recomendado para Render Free/Starter)
+    await downloadParallel(tasks, 5, (idx, success, errMsg) => {
         session.completed++;
         session.progress.push({
             index: idx,
