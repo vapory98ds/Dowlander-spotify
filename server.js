@@ -7,12 +7,11 @@ const archiver = require('archiver');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
-const { execFile } = require('child_process');
+const ytDlp = require('yt-dlp-exec');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const YTDLP_PATH = path.join(__dirname, 'yt-dlp.exe');
 const LOG_FILE = path.join(__dirname, 'server_debug.log');
 
 // Clear debug log
@@ -61,36 +60,31 @@ async function downloadImage(url) {
     } catch (e) { return null; }
 }
 
-// Helper: Run yt-dlp via execFile
-function downloadAudio(query, outputPath) {
-    return new Promise((resolve, reject) => {
-        const args = [
-            `ytsearch1:${query}`,
-            '-x',
-            '--audio-format', 'mp3',
-            '--audio-quality', '0',
-            '--ffmpeg-location', path.dirname(ffmpegPath),
-            '-o', outputPath
-        ];
-
-        log(`ExecFile: ${YTDLP_PATH}`);
-        log(`Args: ${JSON.stringify(args)}`);
-
-        const child = execFile(YTDLP_PATH, args, (error, stdout, stderr) => {
-            if (error) {
-                log(`ExecFile Error Code: ${error.code}`);
-                log(`STDERR: ${stderr}`);
-                // Strict check: if code is non-zero, check if file exists
-                if (fs.existsSync(outputPath)) {
-                    log('File exists despite error code. Proceeding.');
-                    return resolve(outputPath);
-                }
-                return reject(error);
-            }
-            log(`Success: ${stdout.substring(0, 100)}...`);
-            resolve(outputPath);
+// Helper: Run yt-dlp via yt-dlp-exec
+async function downloadAudio(query, outputPath) {
+    try {
+        log(`Executing yt-dlp-exec for: ${query}`);
+        await ytDlp(`ytsearch1:${query}`, {
+            extractAudio: true,
+            audioFormat: 'mp3',
+            audioQuality: 0,
+            ffmpegLocation: path.dirname(ffmpegPath),
+            output: outputPath,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true
         });
-    });
+
+        if (fs.existsSync(outputPath)) {
+            log(`Success: File created at ${outputPath}`);
+            return outputPath;
+        } else {
+            throw new Error('yt-dlp sub-process completed but output file is missing.');
+        }
+    } catch (error) {
+        log(`yt-dlp Error: ${error.message}`);
+        throw error;
+    }
 }
 
 // Endpoint: Download Track
