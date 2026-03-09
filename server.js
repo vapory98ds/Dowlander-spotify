@@ -69,134 +69,58 @@ async function downloadFile(url, outputPath) {
     return outputPath;
 }
 
-// Helper: Fetch YouTube URL from Piped/Invidious (Proxy Search)
-async function fetchYouTubeUrl(query) {
-    const pipedInstances = [
-        'https://pipedapi.adminforge.de',
-        'https://pipedapi.darkness.services',
-        'https://pipedapi.kavin.rocks',
-        'https://piped-api.garudalinux.org'
+// Helper: Download via dlapi.app (API confiable verificada)
+async function downloadWithDlapi(trackId, outputPath) {
+    // Posibles endpoints de dlapi.app (intentar varios para mayor resiliencia)
+    const endpoints = [
+        `https://api.dlapi.app/spotify/track?id=${trackId}`,
+        `https://api.dlapi.app/spotify?trackid=${trackId}`,
+        `https://dlapi.app/api/spotify/track?id=${trackId}`
     ];
 
-    for (const base of pipedInstances) {
+    for (const url of endpoints) {
         try {
-            log(`[Piped] Buscando en ${base}...`);
-            const res = await fetch(`${base}/search?q=${encodeURIComponent(query)}&filter=videos`, {
-                signal: AbortSignal.timeout(8000)
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const text = await res.text();
-            const data = JSON.parse(text);
-
-            if (data.items && data.items.length > 0) {
-                const item = data.items[0];
-                const videoId = (item.url || '').replace('/watch?v=', '');
-                const url = `https://www.youtube.com/watch?v=${videoId}`;
-                log(`[Piped] Video encontrado: ${url}`);
-                return url;
-            }
-        } catch (e) {
-            log(`[Piped Error] ${base}: ${e.message}`);
-        }
-    }
-
-    log('[Piped] Todas las instancias fallaron.');
-    return null;
-}
-
-// Helper: Download via Cobalt Instance (Proxy Download)
-async function downloadWithCobalt(youtubeUrl, outputPath) {
-    const instances = [
-        'https://api.cobalt.tools',
-        'https://cobalt.asdfghjkl.ovh',
-        'https://api.cobalt.run'
-    ];
-
-    for (const api of instances) {
-        try {
-            log(`[Cobalt] Intentando con instancia: ${api}`);
-            const res = await fetch(api, {
-                method: 'POST',
+            log(`[dlapi] Intentando: ${url}`);
+            const res = await fetch(url, {
                 headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                    'Accept': 'application/json'
                 },
-                body: JSON.stringify({
-                    url: youtubeUrl,
-                    downloadMode: 'audio',
-                    audioFormat: 'mp3',
-                    audioBitrate: '320'
-                })
+                signal: AbortSignal.timeout(15000)
             });
 
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            if (data.status === 'stream' || data.status === 'redirect' || data.status === 'tunnel') {
-                const downloadUrl = data.url;
-                log(`[Cobalt] Link obtenido: ${downloadUrl}`);
+
+            // Formato: { status: true, data: { download: '...', title: '...', author: '...' } }
+            const downloadUrl = data?.data?.download || data?.link || data?.url;
+            if (downloadUrl) {
+                log(`[dlapi] ¡Link obtenido! Descargando desde: ${downloadUrl.substring(0, 60)}...`);
                 await downloadFile(downloadUrl, outputPath);
                 return true;
             }
-            throw new Error(data.message || 'Estado fallido');
+            throw new Error('Respuesta sin link de descarga: ' + JSON.stringify(data).substring(0, 100));
         } catch (e) {
-            log(`[Cobalt Error] Instancia ${api} falló: ${e.message}`);
+            log(`[dlapi Error] ${url}: ${e.message}`);
         }
     }
     return false;
 }
 
-// Helper: Multi-API Audio Downloader (Solución Definitiva de 3ra Gen)
+// Motor principal de descarga
 async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
     const query = `${trackArtist} - ${trackName} audio`;
 
-    // NIVEL 1: Doble Proxy (Piped + Cobalt) - Lo más seguro contra bloqueos
-    log(`[3ra GEN] Intentando método Doble Proxy (Piped + Cobalt)...`);
-    const ytUrl = await fetchYouTubeUrl(query);
-    if (ytUrl) {
-        const success = await downloadWithCobalt(ytUrl, outputPath);
-        if (success) {
-            log(`[3ra GEN] ¡Éxito total! Descargado vía Doble Proxy.`);
-            return outputPath;
-        }
+    // NIVEL 1: dlapi.app (API confiable verificada por el usuario)
+    log(`[Motor] Intentando dlapi.app para ID: ${trackId}...`);
+    const ok = await downloadWithDlapi(trackId, outputPath);
+    if (ok) {
+        log(`[Motor] ¡Éxito! Descargado vía dlapi.app`);
+        return outputPath;
     }
 
-    // NIVEL 2: APIs Directas (SpotifyDown, SpotiSong)
-    log(`[3ra GEN] Falló Doble Proxy. Intentando APIs directas...`);
-    const apis = [
-        // API 1: SpotifyDown.com
-        async () => {
-            log(`[API 1] Probando SpotifyDown para ID: ${trackId}`);
-            const headers = {
-                'Origin': 'https://spotifydown.com',
-                'Referer': 'https://spotifydown.com/',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-            };
-            const res = await fetch(`https://api.spotifydown.com/download/${trackId}`, { headers });
-            const data = await res.json();
-            if (data.success && data.link) return data.link;
-            throw new Error(data.message || 'No se obtuvo link');
-        },
-        // API 2: SpotiSongDownloader (Fallback)
-        async () => {
-            log(`[API 2] Probando SpotiSong para ID: ${trackId}`);
-            const res = await fetch(`https://api.spotisongdownloader.com/api/composer/spotify/track/${trackId}`);
-            const data = await res.json();
-            if (data.download_url) return data.download_url;
-            throw new Error('No se obtuvo link de SpotiSong');
-        }
-    ];
-
-    for (let i = 0; i < apis.length; i++) {
-        try {
-            const downloadUrl = await apis[i]();
-            log(`[API] Link obtenido con éxito (API ${i + 1}), descargando...`);
-            await downloadFile(downloadUrl, outputPath);
-            return outputPath;
-        } catch (e) {
-            log(`[API ${i + 1}] Falló: ${e.message}`);
-        }
-    }
-
-    log(`[3ra GEN] Todas las APIs externas fallaron. Intentando fallback pesado (yt-dlp)...`);
+    // NIVEL 2: yt-dlp con cookies (fallback final)
+    log(`[Motor] dlapi.app falló. Usando fallback yt-dlp...`);
     return await downloadAudioFallback(query, outputPath);
 }
 
