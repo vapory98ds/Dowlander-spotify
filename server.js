@@ -51,6 +51,15 @@ app.get('/', (req, res) => {
     res.send('Servidor de Xavi en línea y funcionando 24/7');
 });
 
+// Helper: Download Image
+async function downloadImage(url) {
+    if (!url) return null;
+    try {
+        const response = await axios({ url, responseType: 'arraybuffer' });
+        return response.data;
+    } catch (e) { return null; }
+}
+
 // Motor principal de descarga - SOLO SOUNDCLOUD (Más rápido y sin bloqueos en Render)
 async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
     const query = `${trackArtist} - ${trackName}`;
