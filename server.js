@@ -72,7 +72,15 @@ async function downloadAudio(query, outputPath) {
             output: outputPath,
             noCheckCertificates: true,
             noWarnings: true,
-            preferFreeFormats: true
+            preferFreeFormats: true,
+            // Evasión de bloqueo de bots
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            addHeader: [
+                'Accept-Language: es-ES,es;q=0.9,en;q=0.8',
+                'Sec-Ch-Ua: "Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+                'Sec-Ch-Ua-Mobile: ?0',
+                'Sec-Ch-Ua-Platform: "Windows"'
+            ]
         });
 
         if (fs.existsSync(outputPath)) {
