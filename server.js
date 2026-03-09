@@ -51,189 +51,39 @@ app.get('/', (req, res) => {
     res.send('Servidor de Xavi en línea y funcionando 24/7');
 });
 
-// ============================================================
-// ENDPOINT DE DIAGNÓSTICO TEMPORAL - Probar dlapi.app desde Render
-// Usa: GET /api/test-dlapi?id=SPOTIFY_TRACK_ID
-// ============================================================
-app.get('/api/test-dlapi', async (req, res) => {
-    const trackId = req.query.id || '7FxaIJrCTlq2mHhcIdq3pA';
-    const endpoints = [
-        `https://api.dlapi.app/spotify/track?id=${trackId}`,
-        `https://api.dlapi.app/spotify?id=${trackId}`,
-        `https://api.dlapi.app/track?id=${trackId}`,
-        `https://api.dlapi.app/download?url=https://open.spotify.com/track/${trackId}`,
-        `https://api.dlapi.app/api/spotify?id=${trackId}`,
-        `https://api.dlapi.app/spotify/download?id=${trackId}`
-    ];
-
-    const results = [];
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'application/json'
-    };
-
-    for (const url of endpoints) {
-        try {
-            const r = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
-            const text = await r.text();
-            let json = null;
-            try { json = JSON.parse(text); } catch (e) { }
-            results.push({ url, status: r.status, response: json || text.substring(0, 300), hasDownload: !!(json?.data?.download || json?.link || json?.url) });
-        } catch (e) {
-            results.push({ url, error: e.message });
-        }
-    }
-    res.json({ trackId, results });
-});
-
-// Helper: Download Image
-async function downloadImage(url) {
-    if (!url) return null;
-    try {
-        const response = await axios({ url, responseType: 'arraybuffer' });
-        return response.data;
-    } catch (e) { return null; }
-}
-
-// Helper: Download file from URL
-async function downloadFile(url, outputPath) {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Fallo al descargar archivo: ${response.statusText}`);
-    const buffer = await response.buffer();
-    fs.writeFileSync(outputPath, buffer);
-    return outputPath;
-}
-
-// Helper: Download via dlapi.app (API confiable verificada)
-async function downloadWithDlapi(trackId, outputPath) {
-    // NOTA: api.dlapi.app tarda >15s en responder desde Render, usar timeout de 60s
-    const endpoints = [
-        `https://api.dlapi.app/spotify/track?id=${trackId}`,
-        `https://api.dlapi.app/spotify?trackid=${trackId}`,
-        `https://api.dlapi.app/spotify?id=${trackId}`
-    ];
-
-    for (const url of endpoints) {
-        try {
-            log(`[dlapi] Intentando: ${url} (timeout: 60s)`);
-            const res = await fetch(url, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                    'Accept': 'application/json'
-                },
-                signal: AbortSignal.timeout(60000) // 60 segundos - la API es lenta pero responde
-            });
-
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-
-            // Formato: { status: true, data: { download: '...', title: '...', author: '...' } }
-            const downloadUrl = data?.data?.download || data?.link || data?.url || data?.download;
-            if (downloadUrl) {
-                log(`[dlapi] ¡Link obtenido! Descargando MP3...`);
-                await downloadFile(downloadUrl, outputPath);
-                return true;
-            }
-            log(`[dlapi] Respuesta recibida pero sin link: ${JSON.stringify(data).substring(0, 150)}`);
-        } catch (e) {
-            log(`[dlapi Error] ${url}: ${e.message}`);
-        }
-    }
-    return false;
-}
-
-// Motor principal de descarga
+// Motor principal de descarga - SOLO SOUNDCLOUD (Más rápido y sin bloqueos en Render)
 async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
-    const query = `${trackArtist} - ${trackName} audio`;
-
-    // NIVEL 1: dlapi.app (API confiable verificada por el usuario)
-    log(`[Motor] Intentando dlapi.app para ID: ${trackId}...`);
-    const ok = await downloadWithDlapi(trackId, outputPath);
-    if (ok) {
-        log(`[Motor] ¡Éxito! Descargado vía dlapi.app`);
-        return outputPath;
-    }
-
-    // NIVEL 2: yt-dlp con cookies (fallback final)
-    log(`[Motor] dlapi.app falló. Usando fallback yt-dlp...`);
-    return await downloadAudioFallback(query, outputPath);
-}
-
-// Fallback: yt-dlp con cliente iOS (no requiere PO Token) + SoundCloud
-async function downloadAudioFallback(query, outputPath) {
-    const cookiesPath = (() => {
-        const paths = [
-            path.join(__dirname, 'cookies.txt'),
-            path.join(__dirname, 'docs', 'www.youtube.com_cookies.txt'),
-            path.join(__dirname, 'docs', 'cookies.txt')
-        ];
-        for (const p of paths) { if (fs.existsSync(p)) return p; }
-        return null;
-    })();
-
-    if (cookiesPath) log(`[Cookies] Usando: ${cookiesPath}`);
-    else log('[Cookies] Sin cookies');
-
-    const baseOpts = {
-        extractAudio: true, audioFormat: 'mp3', audioQuality: 0,
-        ffmpegLocation: path.dirname(ffmpegPath),
-        output: outputPath,
-        noCheckCertificates: true, noWarnings: true, preferFreeFormats: true,
-        addHeader: [
-            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Accept-Language: es-ES,es;q=0.9,en;q=0.8'
-        ]
-    };
-    if (cookiesPath) baseOpts.cookies = cookiesPath;
-
-    // INTENTO 1: SoundCloud (no bloquea IPs de datacenter)
+    const query = `${trackArtist} - ${trackName}`;
     try {
-        log(`[SC] Buscando en SoundCloud: ${query}`);
-        const scOpts = { ...baseOpts, noPlaylist: true };
-        await ytDlp(`scsearch1:${query}`, scOpts);
-        if (fs.existsSync(outputPath)) {
-            log('[SC] ¡Éxito! Descargado desde SoundCloud');
-            return outputPath;
-        }
-    } catch (e) {
-        log(`[SC Error] ${e.message.substring(0, 120)}`);
-    }
+        log(`[SoundCloud] Buscando y descargando: ${query}`);
 
-    // INTENTO 2: YouTube con cliente iOS (no requiere PO Token desde datacenter)
-    try {
-        log(`[YT-iOS] Intentando YouTube con cliente iOS...`);
-        const iosOpts = {
-            ...baseOpts,
-            extractorArgs: 'youtube:player_client=ios',
-            noPlaylist: true
+        const options = {
+            extractAudio: true,
+            audioFormat: 'mp3',
+            audioQuality: 0,
+            ffmpegLocation: path.dirname(ffmpegPath),
+            output: outputPath,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true,
+            noPlaylist: true,
+            addHeader: [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+            ]
         };
-        await ytDlp(`ytsearch1:${query}`, iosOpts);
+
+        // Búsqueda directa en SoundCloud (scsearch1)
+        await ytDlp(`scsearch1:${query}`, options);
+
         if (fs.existsSync(outputPath)) {
-            log('[YT-iOS] ¡Éxito! Descargado desde YouTube vía cliente iOS');
+            log(`[Éxito] Descargado desde SoundCloud: ${outputPath}`);
             return outputPath;
         }
-    } catch (e) {
-        log(`[YT-iOS Error] ${e.message.substring(0, 120)}`);
+        throw new Error('El archivo no se generó tras la descarga.');
+    } catch (error) {
+        log(`[SC Error] ${error.message}`);
+        throw new Error(`Fallo al descargar desde SoundCloud: ${error.message}`);
     }
-
-    // INTENTO 3: YouTube con cliente TV Embedded (alternativa)
-    try {
-        log(`[YT-TV] Intentando YouTube con cliente TV Embedded...`);
-        const tvOpts = {
-            ...baseOpts,
-            extractorArgs: 'youtube:player_client=tv_embedded',
-            noPlaylist: true
-        };
-        await ytDlp(`ytsearch1:${query}`, tvOpts);
-        if (fs.existsSync(outputPath)) {
-            log('[YT-TV] ¡Éxito! Descargado desde YouTube vía TV Embedded');
-            return outputPath;
-        }
-    } catch (e) {
-        log(`[YT-TV Error] ${e.message.substring(0, 120)}`);
-    }
-
-    throw new Error('Todos los métodos fallaron: SoundCloud, iOS y TV Embedded');
 }
 
 // Track download sessions (in-memory)
