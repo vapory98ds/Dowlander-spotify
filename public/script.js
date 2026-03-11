@@ -15,11 +15,16 @@ async function fetchInfo() {
     card.classList.remove('show');
     btn.disabled = true;
 
-    // Reset progress
-    document.getElementById('progressContainer').classList.add('hidden');
-    document.getElementById('visualStatusColumn').style.display = 'none';
-    document.getElementById('visualDownloading').style.display = 'none';
-    document.getElementById('visualFinished').style.display = 'none';
+    // Reset progress visual
+    const visualColumn = document.getElementById('visualStatusColumn');
+    if (visualColumn) {
+        visualColumn.classList.add('hidden');
+        visualColumn.style.display = 'none';
+    }
+    const visualDownloading = document.getElementById('visualDownloading');
+    if (visualDownloading) visualDownloading.style.display = 'none';
+    const visualFinished = document.getElementById('visualFinished');
+    if (visualFinished) visualFinished.style.display = 'none';
 
     try {
         const response = await fetch(`${API_BASE}/api/info?url=${encodeURIComponent(url)}`);
@@ -212,10 +217,6 @@ async function downloadTrack() {
 
 async function downloadAlbum() {
     const statusMsg = document.getElementById('statusMsg');
-    const progressContainer = document.getElementById('progressContainer');
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
-    const progressPercent = document.getElementById('progressPercent');
 
     const visualColumn = document.getElementById('visualStatusColumn');
     const visualDownloading = document.getElementById('visualDownloading');
