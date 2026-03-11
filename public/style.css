@@ -1156,3 +1156,94 @@ input[type="url"]::placeholder {
         height: 120px;
     }
 }
+
+/* =========================================
+   CUSTOM LEFT STATUS COLUMN (NUEVO)
+   ========================================= */
+.result-layout {
+    display: flex;
+    flex-direction: row;
+    gap: 30px;
+    align-items: stretch;
+}
+
+.left-status-column {
+    flex: 0 0 250px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    padding-right: 20px;
+    min-height: 200px;
+}
+
+.right-details-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.visual-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    text-align: center;
+    animation: fadeIn 0.5s ease forwards;
+    width: 100%;
+}
+
+.custom-status-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    object-fit: contain;
+}
+
+.pulse-anim {
+    animation: slowPulse 2s infinite alternate ease-in-out;
+}
+
+.pop-anim {
+    animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.custom-status-text {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.success-text {
+    color: var(--accent-light);
+    text-shadow: 0 0 10px rgba(29, 185, 84, 0.4);
+}
+
+@keyframes slowPulse {
+    from { transform: scale(0.98); opacity: 0.9; }
+    to { transform: scale(1.02); opacity: 1; filter: drop-shadow(0 0 15px rgba(29, 185, 84, 0.4)); }
+}
+
+@keyframes popIn {
+    0% { transform: scale(0.8) translateY(20px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .result-layout {
+        flex-direction: column;
+        align-items: center;
+    }
+    .left-status-column {
+        flex: none;
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        padding-right: 0;
+        padding-bottom: 20px;
+        margin-bottom: 20px;
+        min-height: auto;
+    }
+}

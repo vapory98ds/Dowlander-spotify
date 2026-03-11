@@ -17,6 +17,9 @@ async function fetchInfo() {
 
     // Reset progress
     document.getElementById('progressContainer').classList.add('hidden');
+    document.getElementById('visualStatusColumn').style.display = 'none';
+    document.getElementById('visualDownloading').style.display = 'none';
+    document.getElementById('visualFinished').style.display = 'none';
 
     try {
         const response = await fetch(`${API_BASE}/api/info?url=${encodeURIComponent(url)}`);
@@ -106,6 +109,25 @@ async function downloadTrack() {
     statusMsg.innerText = "⏳ Inicializando descarga...";
     statusMsg.className = 'status';
 
+    const visualColumn = document.getElementById('visualStatusColumn');
+    const visualDownloading = document.getElementById('visualDownloading');
+    const visualFinished = document.getElementById('visualFinished');
+    const visualPercent = document.getElementById('visualPercent');
+
+    visualColumn.style.display = 'flex';
+    visualDownloading.style.display = 'flex';
+    visualFinished.style.display = 'none';
+    visualPercent.innerText = '0%';
+
+    let simProgress = 0;
+    const simInterval = setInterval(() => {
+        if(simProgress < 95) {
+            simProgress += Math.floor(Math.random() * 8) + 2;
+            if(simProgress > 95) simProgress = 95;
+            visualPercent.innerText = `${simProgress}%`;
+        }
+    }, 1200);
+
     try {
         const startResponse = await fetch(`${API_BASE}/api/start-track-download`, {
             method: 'POST',
@@ -156,9 +178,15 @@ async function downloadTrack() {
         const blob = await fileResponse.blob();
         triggerDownload(blob, `${currentData.name}.mp3`);
 
+        clearInterval(simInterval);
+        visualPercent.innerText = '100%';
+        visualDownloading.style.display = 'none';
+        visualFinished.style.display = 'flex';
+
         statusMsg.innerText = "✅ ¡Canción descargada con éxito!";
         statusMsg.className = 'status success';
     } catch (e) {
+        if (typeof simInterval !== 'undefined') clearInterval(simInterval);
         console.error(e);
         statusMsg.innerText = "Error: " + e.message;
         statusMsg.className = 'status error';
@@ -172,12 +200,22 @@ async function downloadAlbum() {
     const progressText = document.getElementById('progressText');
     const progressPercent = document.getElementById('progressPercent');
 
+    const visualColumn = document.getElementById('visualStatusColumn');
+    const visualDownloading = document.getElementById('visualDownloading');
+    const visualFinished = document.getElementById('visualFinished');
+    const visualPercent = document.getElementById('visualPercent');
+
     // Show progress bar
     progressContainer.classList.remove('hidden');
     progressFill.style.width = '0%';
     progressText.innerText = 'Iniciando descarga del álbum...';
     progressPercent.innerText = '0%';
     statusMsg.innerText = '';
+    
+    visualColumn.style.display = 'flex';
+    visualDownloading.style.display = 'flex';
+    visualFinished.style.display = 'none';
+    visualPercent.innerText = '0%';
 
     // Step 1: Start album download (get session ID)
     const startResponse = await fetch(`${API_BASE}/api/start-album-download`, {
@@ -222,6 +260,8 @@ async function downloadAlbum() {
                 progressFill.style.width = `${percent}%`;
                 progressPercent.innerText = `${percent}%`;
                 progressText.innerText = `Descargando ${data.completed} de ${data.total} canciones...`;
+                
+                visualPercent.innerText = `${percent}%`;
 
                 // Scroll to track
                 if (li) li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -255,6 +295,9 @@ async function downloadAlbum() {
 
     const blob = await zipResponse.blob();
     triggerDownload(blob, `${currentData.name}.zip`);
+
+    visualDownloading.style.display = 'none';
+    visualFinished.style.display = 'flex';
 
     progressText.innerText = '🎉 ¡Álbum descargado con éxito!';
     statusMsg.innerText = '✅ ¡Descarga completada!';

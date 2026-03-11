@@ -67,55 +67,75 @@
         <div id="resultCard" class="result-card hidden">
             <div class="card-glass-bg"></div>
 
-            <div class="media-header">
-                <div class="art-container">
-                    <img id="albumArt" src="" alt="Portada">
-                    <div class="art-overlay"><i class="fas fa-music overlay-icon"></i></div>
-                </div>
-                <div class="media-details">
-                    <span id="typeBadge" class="media-badge"><i class="fas fa-compact-disc"></i> TRACK</span>
-                    <h2 id="trackTitle" class="media-title">Título de la Canción</h2>
-                    <h3 id="artistName" class="media-artist">Artista</h3>
-                </div>
-            </div>
-
-            <!-- Lista de Canciones Estilizada -->
-            <div id="trackListContainer" class="tracks-container hidden">
-                <div class="tracks-header">
-                    <h4><i class="fas fa-list-ul"></i> Lista de Reproducción (<span id="trackCount"
-                            class="text-gradient">0</span>)</h4>
-                </div>
-                <div class="tracks-scroll-area">
-                    <ul id="trackList" class="track-list-modern">
-                        <!-- JS populate -->
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Progreso Moderno -->
-            <div id="progressContainer" class="progress-wrapper hidden">
-                <div class="progress-info">
-                    <span id="progressText"><i class="fas fa-cloud-download-alt"></i> Preparando descarga...</span>
-                    <span id="progressPercent" class="text-gradient">0%</span>
-                </div>
-                <div class="track-progress">
-                    <div id="progressFill" class="track-progress-fill">
-                        <div class="progress-glow"></div>
+            <div class="result-layout">
+                <!-- Columna Izquierda: Estado Visual (Imágenes) -->
+                <div class="left-status-column" id="visualStatusColumn" style="display: none;">
+                    <!-- Estado 1: Descargando -->
+                    <div id="visualDownloading" class="visual-state" style="display: none;">
+                        <img src="barra de estado a lado izquierdo.png" alt="Descargando" class="custom-status-img pulse-anim">
+                        <div class="custom-status-text text-gradient">Descargando... <span id="visualPercent">0%</span></div>
+                    </div>
+                    <!-- Estado 2: Finalizado -->
+                    <div id="visualFinished" class="visual-state" style="display: none;">
+                        <img src="estado finalizado.png" alt="Finalizado" class="custom-status-img pop-anim">
+                        <div class="custom-status-text success-text">Descarga finalizada</div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Controles de Acción -->
-            <div class="action-controls">
-                <button id="downloadBtn" class="btn-download" onclick="startDownload()">
-                    <span class="btn-text">Descargar</span>
-                    <i class="fas fa-arrow-down btn-icon-right"></i>
-                </button>
-            </div>
+                <!-- Columna Derecha: Contenido Principal -->
+                <div class="right-details-column">
+                    <div class="media-header">
+                        <div class="art-container">
+                            <img id="albumArt" src="" alt="Portada">
+                            <div class="art-overlay"><i class="fas fa-music overlay-icon"></i></div>
+                        </div>
+                        <div class="media-details">
+                            <span id="typeBadge" class="media-badge"><i class="fas fa-compact-disc"></i> TRACK</span>
+                            <h2 id="trackTitle" class="media-title">Título de la Canción</h2>
+                            <h3 id="artistName" class="media-artist">Artista</h3>
+                        </div>
+                    </div>
 
-            <!-- Notificación de Estado -->
-            <div class="status-indicator">
-                <p id="statusMsg" class="status-msg"></p>
+                    <!-- Lista de Canciones Estilizada -->
+                    <div id="trackListContainer" class="tracks-container hidden">
+                        <div class="tracks-header">
+                            <h4><i class="fas fa-list-ul"></i> Lista de Reproducción (<span id="trackCount"
+                                    class="text-gradient">0</span>)</h4>
+                        </div>
+                        <div class="tracks-scroll-area">
+                            <ul id="trackList" class="track-list-modern">
+                                <!-- JS populate -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Progreso Original (Oculto o removido) -->
+                    <div id="progressContainer" class="progress-wrapper hidden" style="display: none !important;">
+                        <!-- Ocultado porque usaremos las imágenes a la izquierda -->
+                        <div class="progress-info">
+                            <span id="progressText"><i class="fas fa-cloud-download-alt"></i> Preparando descarga...</span>
+                            <span id="progressPercent" class="text-gradient">0%</span>
+                        </div>
+                        <div class="track-progress">
+                            <div id="progressFill" class="track-progress-fill">
+                                <div class="progress-glow"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Controles de Acción -->
+                    <div class="action-controls">
+                        <button id="downloadBtn" class="btn-download" onclick="startDownload()">
+                            <span class="btn-text">Descargar</span>
+                            <i class="fas fa-arrow-down btn-icon-right"></i>
+                        </button>
+                    </div>
+
+                    <!-- Notificación de Estado -->
+                    <div class="status-indicator">
+                        <p id="statusMsg" class="status-msg"></p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
