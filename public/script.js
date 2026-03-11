@@ -113,11 +113,13 @@ async function downloadTrack() {
     const visualDownloading = document.getElementById('visualDownloading');
     const visualFinished = document.getElementById('visualFinished');
     const visualPercent = document.getElementById('visualPercent');
+    const walkingImage = document.getElementById('walkingImage');
 
     visualColumn.style.display = 'flex';
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
     visualPercent.innerText = '0%';
+    if (walkingImage) walkingImage.style.right = '100%';
 
     let simProgress = 0;
     const simInterval = setInterval(() => {
@@ -125,6 +127,10 @@ async function downloadTrack() {
             simProgress += Math.floor(Math.random() * 8) + 2;
             if(simProgress > 95) simProgress = 95;
             visualPercent.innerText = `${simProgress}%`;
+            if (walkingImage) {
+                // Starts at right: 100% (right end), walks left to right: 0% (left end)
+                walkingImage.style.right = `${100 - simProgress}%`;
+            }
         }
     }, 1200);
 
@@ -180,6 +186,8 @@ async function downloadTrack() {
 
         clearInterval(simInterval);
         visualPercent.innerText = '100%';
+        if (walkingImage) walkingImage.style.right = '0%';
+
         visualDownloading.style.display = 'none';
         visualFinished.style.display = 'flex';
 
@@ -204,6 +212,7 @@ async function downloadAlbum() {
     const visualDownloading = document.getElementById('visualDownloading');
     const visualFinished = document.getElementById('visualFinished');
     const visualPercent = document.getElementById('visualPercent');
+    const walkingImage = document.getElementById('walkingImage');
 
     // Show progress bar
     progressContainer.classList.remove('hidden');
@@ -216,6 +225,7 @@ async function downloadAlbum() {
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
     visualPercent.innerText = '0%';
+    if (walkingImage) walkingImage.style.right = '100%';
 
     // Step 1: Start album download (get session ID)
     const startResponse = await fetch(`${API_BASE}/api/start-album-download`, {
@@ -262,6 +272,9 @@ async function downloadAlbum() {
                 progressText.innerText = `Descargando ${data.completed} de ${data.total} canciones...`;
                 
                 visualPercent.innerText = `${percent}%`;
+                if (walkingImage) {
+                    walkingImage.style.right = `${100 - percent}%`;
+                }
 
                 // Scroll to track
                 if (li) li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -273,6 +286,8 @@ async function downloadAlbum() {
                 if (data.status === 'done') {
                     progressFill.style.width = '100%';
                     progressPercent.innerText = '100%';
+                    visualPercent.innerText = '100%';
+                    if (walkingImage) walkingImage.style.right = '0%';
                     progressText.innerText = '✅ ¡Álbum completo! Generando ZIP...';
                     resolve();
                 } else {

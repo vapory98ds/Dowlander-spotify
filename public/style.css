@@ -1195,12 +1195,36 @@ input[type="url"]::placeholder {
     width: 100%;
 }
 
+.walking-track {
+    width: 100%;
+    height: 60px; /* Altura suficiente para que la imagen se vea bien */
+    position: relative;
+    background: rgba(255, 255, 255, 0.05); /* Pista sutil */
+    border-radius: 30px;
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    margin-top: 10px;
+}
+
 .custom-status-img {
-    max-width: 100%;
-    height: auto;
+    height: 100%; /* La imagen toma la altura de la pista */
+    width: auto;
     border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
     object-fit: contain;
+    position: absolute;
+    /* Inicia a la derecha (0% completado). Se moverá hacia la izquierda (100% completado) */
+    right: 0%; 
+    top: 0;
+    transition: right 0.3s ease-out; /* Movimiento fluido */
+}
+
+/* Imagen finalizada (ya no es parte de la pista animada) */
+#visualFinished .custom-status-img {
+    position: relative;
+    right: auto;
+    height: auto;
+    max-width: 100%;
 }
 
 .pulse-anim {
