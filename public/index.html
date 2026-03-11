@@ -63,28 +63,29 @@
             <p>Analizando enlace...</p>
         </div>
 
+        <!-- Columna de Estado Visual Externa -->
+        <div class="external-status-container hidden" id="visualStatusColumn">
+            <!-- Estado 1: Descargando -->
+            <div id="visualDownloading" class="visual-state" style="display: none;">
+                <div class="walking-track">
+                    <div class="walking-fill" id="walkingFill"></div>
+                    <img src="barra de estado a lado izquierdo.png" alt="Descargando" id="walkingImage" class="custom-status-img pulse-anim">
+                </div>
+                <div class="custom-status-text text-gradient">Descargando... <span id="visualPercent">0%</span></div>
+            </div>
+            <!-- Estado 2: Finalizado -->
+            <div id="visualFinished" class="visual-state" style="display: none;">
+                <img src="estado finalizado.png" alt="Finalizado" class="custom-status-img pop-anim">
+                <div class="custom-status-text success-text">Descarga finalizada</div>
+            </div>
+        </div>
+
         <!-- Tarjeta de Resultados Avanzada -->
         <div id="resultCard" class="result-card hidden">
             <div class="card-glass-bg"></div>
 
             <div class="result-layout">
-                <!-- Columna Izquierda: Estado Visual (Imágenes) -->
-                <div class="left-status-column" id="visualStatusColumn" style="display: none;">
-                    <!-- Estado 1: Descargando -->
-                    <div id="visualDownloading" class="visual-state" style="display: none;">
-                        <div class="walking-track">
-                            <img src="barra de estado a lado izquierdo.png" alt="Descargando" id="walkingImage" class="custom-status-img pulse-anim">
-                        </div>
-                        <div class="custom-status-text text-gradient">Descargando... <span id="visualPercent">0%</span></div>
-                    </div>
-                    <!-- Estado 2: Finalizado -->
-                    <div id="visualFinished" class="visual-state" style="display: none;">
-                        <img src="estado finalizado.png" alt="Finalizado" class="custom-status-img pop-anim">
-                        <div class="custom-status-text success-text">Descarga finalizada</div>
-                    </div>
-                </div>
-
-                <!-- Columna Derecha: Contenido Principal -->
+                <!-- Contenido Principal -->
                 <div class="right-details-column">
                     <div class="media-header">
                         <div class="art-container">
@@ -108,20 +109,6 @@
                             <ul id="trackList" class="track-list-modern">
                                 <!-- JS populate -->
                             </ul>
-                        </div>
-                    </div>
-
-                    <!-- Progreso Original (Oculto o removido) -->
-                    <div id="progressContainer" class="progress-wrapper hidden" style="display: none !important;">
-                        <!-- Ocultado porque usaremos las imágenes a la izquierda -->
-                        <div class="progress-info">
-                            <span id="progressText"><i class="fas fa-cloud-download-alt"></i> Preparando descarga...</span>
-                            <span id="progressPercent" class="text-gradient">0%</span>
-                        </div>
-                        <div class="track-progress">
-                            <div id="progressFill" class="track-progress-fill">
-                                <div class="progress-glow"></div>
-                            </div>
                         </div>
                     </div>
 

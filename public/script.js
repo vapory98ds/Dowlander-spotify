@@ -114,25 +114,27 @@ async function downloadTrack() {
     const visualFinished = document.getElementById('visualFinished');
     const visualPercent = document.getElementById('visualPercent');
     const walkingImage = document.getElementById('walkingImage');
+    const walkingFill = document.getElementById('walkingFill');
 
-    visualColumn.style.display = 'flex';
+    visualColumn.classList.remove('hidden');
+    visualColumn.style.display = 'block';
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
-    visualPercent.innerText = '0%';
+    visualPercent.innerText = 'Iniciando conexión...';
     if (walkingImage) walkingImage.style.right = '100%';
+    if (walkingFill) walkingFill.style.width = '0%';
 
-    let simProgress = 0;
-    const simInterval = setInterval(() => {
-        if(simProgress < 95) {
-            simProgress += Math.floor(Math.random() * 8) + 2;
-            if(simProgress > 95) simProgress = 95;
-            visualPercent.innerText = `${simProgress}%`;
-            if (walkingImage) {
-                // Starts at right: 100% (right end), walks left to right: 0% (left end)
-                walkingImage.style.right = `${100 - simProgress}%`;
-            }
+    let dynamicProgress = 0;
+    
+    // Función para avanzar la barra progresivamente
+    const advanceProgress = (amount, max) => {
+        if (dynamicProgress < max) {
+            dynamicProgress += amount;
+            if (dynamicProgress > max) dynamicProgress = max;
+            if (walkingImage) walkingImage.style.right = `${100 - dynamicProgress}%`;
+            if (walkingFill) walkingFill.style.width = `${dynamicProgress}%`;
         }
-    }, 1200);
+    };
 
     try {
         const startResponse = await fetch(`${API_BASE}/api/start-track-download`, {
@@ -152,7 +154,7 @@ async function downloadTrack() {
         }
 
         const { sessionId } = await startResponse.json();
-        statusMsg.innerText = "🎶 Descargando y procesando audio (no cierres esta ventana, suele tardar unos minutos)...";
+        statusMsg.innerText = "🎶 Conectando al servidor...";
 
         // Listen for progress via SSE
         await new Promise((resolve, reject) => {
@@ -160,8 +162,17 @@ async function downloadTrack() {
 
             eventSource.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-
-                if (data.status === 'done') {
+                
+                if (data.status === 'downloading') {
+                    visualPercent.innerText = data.message || 'Descargando...';
+                    // Avanzar la barra en función del texto recibido.
+                    // Esto da una sensación de avance real sin depender de un set interval ciego.
+                    if (data.message.includes('SoundCloud')) advanceProgress(25, 30);
+                    else if (data.message.includes('Audiomack')) advanceProgress(25, 30);
+                    else if (data.message.includes('Turbo')) advanceProgress(40, 70);
+                    else if (data.message.includes('metadatos')) advanceProgress(20, 95);
+                    else advanceProgress(5, 95); // Heartbeat genérico
+                } else if (data.status === 'done') {
                     eventSource.close();
                     resolve();
                 } else if (data.status === 'error') {
@@ -176,7 +187,7 @@ async function downloadTrack() {
             };
         });
 
-        statusMsg.innerText = "✅ ¡Listo! Descargando archivo a tu dispositivo...";
+        statusMsg.innerText = "✅ ¡Listo! Empaquetando archivo final...";
 
         const fileResponse = await fetch(`${API_BASE}/api/download-track-file/${sessionId}`);
         if (!fileResponse.ok) throw new Error('Error al obtener el MP3 final');
@@ -184,9 +195,8 @@ async function downloadTrack() {
         const blob = await fileResponse.blob();
         triggerDownload(blob, `${currentData.name}.mp3`);
 
-        clearInterval(simInterval);
-        visualPercent.innerText = '100%';
         if (walkingImage) walkingImage.style.right = '0%';
+        if (walkingFill) walkingFill.style.width = '100%';
 
         visualDownloading.style.display = 'none';
         visualFinished.style.display = 'flex';
@@ -194,7 +204,6 @@ async function downloadTrack() {
         statusMsg.innerText = "✅ ¡Canción descargada con éxito!";
         statusMsg.className = 'status success';
     } catch (e) {
-        if (typeof simInterval !== 'undefined') clearInterval(simInterval);
         console.error(e);
         statusMsg.innerText = "Error: " + e.message;
         statusMsg.className = 'status error';
@@ -213,19 +222,15 @@ async function downloadAlbum() {
     const visualFinished = document.getElementById('visualFinished');
     const visualPercent = document.getElementById('visualPercent');
     const walkingImage = document.getElementById('walkingImage');
+    const walkingFill = document.getElementById('walkingFill');
 
-    // Show progress bar
-    progressContainer.classList.remove('hidden');
-    progressFill.style.width = '0%';
-    progressText.innerText = 'Iniciando descarga del álbum...';
-    progressPercent.innerText = '0%';
-    statusMsg.innerText = '';
-    
-    visualColumn.style.display = 'flex';
+    visualColumn.classList.remove('hidden');
+    visualColumn.style.display = 'block';
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
     visualPercent.innerText = '0%';
     if (walkingImage) walkingImage.style.right = '100%';
+    if (walkingFill) walkingFill.style.width = '0%';
 
     // Step 1: Start album download (get session ID)
     const startResponse = await fetch(`${API_BASE}/api/start-album-download`, {
@@ -272,9 +277,8 @@ async function downloadAlbum() {
                 progressText.innerText = `Descargando ${data.completed} de ${data.total} canciones...`;
                 
                 visualPercent.innerText = `${percent}%`;
-                if (walkingImage) {
-                    walkingImage.style.right = `${100 - percent}%`;
-                }
+                if (walkingImage) walkingImage.style.right = `${100 - percent}%`;
+                if (walkingFill) walkingFill.style.width = `${percent}%`;
 
                 // Scroll to track
                 if (li) li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -284,11 +288,9 @@ async function downloadAlbum() {
                 eventSource.close();
 
                 if (data.status === 'done') {
-                    progressFill.style.width = '100%';
-                    progressPercent.innerText = '100%';
                     visualPercent.innerText = '100%';
                     if (walkingImage) walkingImage.style.right = '0%';
-                    progressText.innerText = '✅ ¡Álbum completo! Generando ZIP...';
+                    if (walkingFill) walkingFill.style.width = '100%';
                     resolve();
                 } else {
                     reject(new Error('Error procesando álbum'));

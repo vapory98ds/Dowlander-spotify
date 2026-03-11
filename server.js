@@ -61,7 +61,7 @@ async function downloadImage(url) {
 }
 
 // Motor principal de descarga - MODO TURBO 2.0 (SoundCloud + Audiomack)
-async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
+async function downloadAudio(trackId, trackName, trackArtist, outputPath, session = null) {
     const query = `${trackArtist} - ${trackName}`;
     const baseOptions = {
         extractAudio: true,
@@ -73,18 +73,27 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
         noWarnings: true,
         preferFreeFormats: true,
         noPlaylist: true,
-        concurrentFragments: 15, // TURBO 2.0: 15 hilos simultáneos
+        concurrentFragments: 20, // Aumentado a 20 para intentar mejorar velocidad
         noCacheDir: true,
         addHeader: [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         ]
     };
 
+    // Actualizar estado si se pasó la sesión
+    const setStatus = (msg) => {
+        if (session && session.status !== 'done' && session.status !== 'error') {
+            session.dynamicStatus = msg;
+        }
+    };
+
     // INTENTO 1: SoundCloud (Prioridad 1)
     try {
+        setStatus('Buscando en servidor principal (SoundCloud)...');
         log(`[Turbo 2.0] Buscando en SoundCloud: ${query}`);
         await ytDlp(`scsearch1:${query}`, baseOptions);
         if (fs.existsSync(outputPath)) {
+            setStatus('Procesando audio descargado...');
             log(`[Éxito SC] Descargado desde SoundCloud`);
             return outputPath;
         }
@@ -94,9 +103,11 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath) {
 
     // INTENTO 2: Audiomack (Respaldo Turbo)
     try {
+        setStatus('Buscando en servidor de respaldo (Audiomack)...');
         log(`[Turbo 2.0] Buscando en Audiomack: ${query}`);
         await ytDlp(`audiomacksearch1:${query}`, baseOptions);
         if (fs.existsSync(outputPath)) {
+            setStatus('Procesando audio de respaldo...');
             log(`[Éxito AM] Descargado desde Audiomack`);
             return outputPath;
         }
@@ -144,11 +155,13 @@ async function processTrack(sessionId) {
         const tempFile = path.join(TEMP_DIR, `${sessionId}_${safeName}.mp3`);
 
         // TURBO: Descarga audio e imagen en paralelo
+        session.dynamicStatus = 'Iniciando descarga (Turbo)...';
         const [audioPath, cover] = await Promise.all([
-            downloadAudio(session.id, session.name, session.artist, tempFile),
+            downloadAudio(session.id, session.name, session.artist, tempFile, session),
             downloadImage(session.image)
         ]);
 
+        session.dynamicStatus = 'Aplicando metadatos e imagen de portada...';
         NodeID3.write({ title: session.name, artist: session.artist, APIC: cover }, tempFile);
 
         session.filePath = tempFile;
@@ -177,12 +190,13 @@ app.get('/api/track-progress/:sessionId', (req, res) => {
 
     const interval = setInterval(() => {
         if (session.status === 'done' || session.status === 'error') {
-            res.write(`data: ${JSON.stringify({ status: session.status, error: session.error })}\n\n`);
+            res.write(`data: ${JSON.stringify({ status: session.status, error: session.error, message: 'Descarga finalizada' })}\n\n`);
             clearInterval(interval);
             res.end();
         } else {
-            // Heartbeat against Render's 100s timeout
-            res.write(`data: ${JSON.stringify({ status: 'downloading' })}\n\n`);
+            // Send dynamic track status updates instead of generic heartbeat
+            const msg = session.dynamicStatus || 'Descargando...';
+            res.write(`data: ${JSON.stringify({ status: 'downloading', message: msg })}\n\n`);
         }
     }, 1500);
 

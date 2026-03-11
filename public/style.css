@@ -1158,31 +1158,18 @@ input[type="url"]::placeholder {
 }
 
 /* =========================================
-   CUSTOM LEFT STATUS COLUMN (NUEVO)
+   CUSTOM STATUS COLUMN (EXTERNAL)
    ========================================= */
-.result-layout {
-    display: flex;
-    flex-direction: row;
-    gap: 30px;
-    align-items: stretch;
-}
-
-.left-status-column {
-    flex: 0 0 250px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    border-right: 1px solid rgba(255, 255, 255, 0.05);
-    padding-right: 20px;
-    min-height: 200px;
-}
-
-.right-details-column {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
+.external-status-container {
+    width: 100%;
+    max-width: 650px;
+    margin: 0 auto 2rem;
+    background: var(--bg-surface);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 20px;
+    box-shadow: var(--shadow-md);
+    animation: fadeUp 0.5s ease forwards;
 }
 
 .visual-state {
@@ -1191,7 +1178,6 @@ input[type="url"]::placeholder {
     align-items: center;
     gap: 15px;
     text-align: center;
-    animation: fadeIn 0.5s ease forwards;
     width: 100%;
 }
 
@@ -1204,6 +1190,17 @@ input[type="url"]::placeholder {
     box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
     overflow: hidden;
     margin-top: 10px;
+}
+
+.walking-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 0%;
+    background: linear-gradient(90deg, #1DB954, #1ed760);
+    border-radius: 30px;
+    transition: width 0.3s ease-out;
 }
 
 .custom-status-img {
@@ -1256,18 +1253,8 @@ input[type="url"]::placeholder {
 }
 
 @media (max-width: 768px) {
-    .result-layout {
-        flex-direction: column;
-        align-items: center;
-    }
-    .left-status-column {
-        flex: none;
-        width: 100%;
-        border-right: none;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        padding-right: 0;
-        padding-bottom: 20px;
-        margin-bottom: 20px;
-        min-height: auto;
+    .external-status-container {
+        padding: 15px;
+        margin-bottom: 1.5rem;
     }
 }
