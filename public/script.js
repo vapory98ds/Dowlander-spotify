@@ -210,7 +210,6 @@ async function downloadTrack() {
 
 async function downloadAlbum() {
     const statusMsg = document.getElementById('statusMsg');
-
     const visualColumn = document.getElementById('visualStatusColumn');
     const visualDownloading = document.getElementById('visualDownloading');
     const visualFinished = document.getElementById('visualFinished');
@@ -222,93 +221,101 @@ async function downloadAlbum() {
     visualColumn.style.display = 'block';
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
-    visualPercent.innerText = 'Iniciando descarga del álbum...';
-    // Continuar desde donde quedó fetchInfo (35%)
-    if (walkingImage) walkingImage.style.right = '65%';
-    if (walkingFill) walkingFill.style.width = '35%';
 
-    // Step 1: Start album download (get session ID)
-    const startResponse = await fetch(`${API_BASE}/api/start-album-download`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentData)
-    });
+    let progress = 0;
+    const setBarProgress = (pct) => {
+        pct = Math.min(100, Math.max(0, pct));
+        progress = pct;
+        visualPercent.innerText = `${Math.round(pct)}%`;
+        if (walkingFill) walkingFill.style.width = `${pct}%`;
+        if (walkingImage) walkingImage.style.right = `${pct}%`;
+    };
+    setBarProgress(0); // Iniciamos en 0% siempre
 
-    if (!startResponse.ok) {
-        throw new Error('Error al iniciar descarga del álbum');
-    }
+    // Intervalo suave: para álbumes avanza más lento (0.3% por segundo) 
+    // para que siempre haya movimiento mientras terminan los tracks
+    const progressInterval = setInterval(() => {
+        if (progress < 90) setBarProgress(progress + 0.3);
+    }, 1000);
 
-    const { sessionId, total } = await startResponse.json();
+    try {
+        statusMsg.innerText = "⏳ Preparando álbum...";
+        
+        // Step 1: Start album download
+        const startResponse = await fetch(`${API_BASE}/api/start-album-download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentData)
+        });
 
-    // Step 2: Listen for progress via SSE
-    await new Promise((resolve, reject) => {
-        const eventSource = new EventSource(`${API_BASE}/api/album-progress/${sessionId}`);
+        if (!startResponse.ok) throw new Error('Error al iniciar descarga del álbum');
+        const { sessionId, total } = await startResponse.json();
+        statusMsg.innerText = "🎶 Descargando tracks...";
 
-        eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
+        // Step 2: Listen for progress via SSE
+        await new Promise((resolve, reject) => {
+            const eventSource = new EventSource(`${API_BASE}/api/album-progress/${sessionId}`);
 
-            if (data.type === 'track') {
-                // Update track status
-                const li = document.getElementById(`track-${data.index}`);
-                const statusIcon = document.getElementById(`status-${data.index}`);
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
 
-                if (li && statusIcon) {
-                    if (data.success) {
-                        li.classList.add('downloaded');
-                        statusIcon.className = 'track-status success';
-                        statusIcon.innerText = '✅';
-                    } else {
-                        li.classList.add('failed');
-                        statusIcon.className = 'track-status error';
-                        statusIcon.innerText = '❌';
+                if (data.type === 'track') {
+                    // Actualizar iconos de la lista
+                    const li = document.getElementById(`track-${data.index}`);
+                    const statusIcon = document.getElementById(`status-${data.index}`);
+                    if (li && statusIcon) {
+                        if (data.success) {
+                            li.classList.add('downloaded');
+                            statusIcon.className = 'track-status success';
+                            statusIcon.innerText = '✅';
+                        } else {
+                            li.classList.add('failed');
+                            statusIcon.className = 'track-status error';
+                            statusIcon.innerText = '❌';
+                        }
+                        li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
+
+                    // Sincronizar barra con el progreso real de tracks si es mayor al progreso animado
+                    const realPct = (data.completed / total) * 90;
+                    if (realPct > progress) setBarProgress(realPct);
                 }
 
-                // Actualizar barra visual
-                const percent = Math.round((data.completed / data.total) * 100);
-                visualPercent.innerText = `${percent}%`;
-                if (walkingFill) walkingFill.style.width = `${percent}%`;
-                if (walkingImage) walkingImage.style.right = `${percent}%`;
+                if (data.type === 'done') {
+                    eventSource.close();
+                    if (data.status === 'done') resolve();
+                    else reject(new Error('Error procesando álbum'));
+                }
+            };
 
-                // Scroll to track
-                if (li) li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-
-            if (data.type === 'done') {
+            eventSource.onerror = () => {
                 eventSource.close();
+                reject(new Error('Conexión perdida con el servidor'));
+            };
+        });
 
-                if (data.status === 'done') {
-                    visualPercent.innerText = '100%';
-                    if (walkingFill) walkingFill.style.width = '100%';
-                    if (walkingImage) walkingImage.style.right = '100%';
-                    resolve();
-                } else {
-                    reject(new Error('Error procesando álbum'));
-                }
-            }
-        };
+        clearInterval(progressInterval);
+        setBarProgress(95);
+        statusMsg.innerText = "📦 Creando archivo ZIP...";
 
-        eventSource.onerror = () => {
-            eventSource.close();
-            reject(new Error('Conexión perdida con el servidor'));
-        };
-    });
+        const zipResponse = await fetch(`${API_BASE}/api/download-album-zip/${sessionId}`);
+        if (!zipResponse.ok) throw new Error('Error descargando ZIP');
 
-    // Step 3: Download the ZIP
-    statusMsg.innerText = 'Descargando archivo ZIP...';
+        const blob = await zipResponse.blob();
+        triggerDownload(blob, `${currentData.name}.zip`);
 
-    const zipResponse = await fetch(`${API_BASE}/api/download-album-zip/${sessionId}`);
-    if (!zipResponse.ok) throw new Error('Error descargando ZIP');
+        setBarProgress(100);
+        visualDownloading.style.display = 'none';
+        visualFinished.style.display = 'flex';
 
-    const blob = await zipResponse.blob();
-    triggerDownload(blob, `${currentData.name}.zip`);
-
-    visualDownloading.style.display = 'none';
-    visualFinished.style.display = 'flex';
-
-    progressText.innerText = '🎉 ¡Álbum descargado con éxito!';
-    statusMsg.innerText = '✅ ¡Descarga completada!';
-    statusMsg.className = 'status success';
+        statusMsg.innerText = "✅ ¡Álbum completado!";
+        statusMsg.className = 'status success';
+    } catch (e) {
+        clearInterval(progressInterval);
+        console.error(e);
+        statusMsg.innerText = "Error: " + e.message;
+        statusMsg.className = 'status error';
+    }
 }
 
 function triggerDownload(blob, filename) {

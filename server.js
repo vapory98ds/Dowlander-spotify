@@ -98,6 +98,9 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath, sessio
         ]
     };
 
+    // Si es parte de un álbum o sesión masiva, reducir fragmentos para no saturar CPU/Red
+    const cFrags = session ? (session.tracks ? 8 : 20) : 20;
+
     const setStatus = (msg) => {
         if (session && session.status !== 'done' && session.status !== 'error') {
             session.dynamicStatus = msg;
@@ -123,7 +126,7 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath, sessio
         log(`[SC] Descargando: ${query}`);
         await ytDlp(`scsearch3:${query}`, {
             ...baseOptions,
-            concurrentFragments: 20,
+            concurrentFragments: cFrags,
             matchFilter: 'duration > 60' 
         });
         if (await acceptFile('SC')) return outputPath;
@@ -138,7 +141,7 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath, sessio
         log(`[AM] Descargando: ${query}`);
         await ytDlp(`audiomacksearch1:${query}`, {
             ...baseOptions,
-            concurrentFragments: 20,
+            concurrentFragments: cFrags,
             matchFilter: 'duration > 60'
         });
         if (await acceptFile('AM')) return outputPath;
@@ -153,7 +156,7 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath, sessio
         log(`[YT] Descargando: ${query}`);
         await ytDlp(`ytsearch1:${query}`, {
             ...baseOptions,
-            concurrentFragments: 10
+            concurrentFragments: Math.min(cFrags, 10)
         });
         if (await acceptFile('YT')) return outputPath;
     } catch (e) {
@@ -341,7 +344,7 @@ async function processAlbum(sessionId) {
             const tempFile = path.join(TEMP_DIR, `${sessionId}_${i}_${safeName}.mp3`);
 
             log(`[Album ${sessionId}] Downloading ${i + 1}/${tracks.length}: ${track.name} (ID: ${track.id})`);
-            await downloadAudio(track.id, track.name, track.artist, tempFile);
+            await downloadAudio(track.id, track.name, track.artist, tempFile, session);
 
             NodeID3.write({
                 title: track.name,
@@ -356,8 +359,8 @@ async function processAlbum(sessionId) {
         };
     });
 
-    // TURBO: 5 descargas simultáneas (Límite recomendado para Render Free/Starter)
-    await downloadParallel(tasks, 5, (idx, success, errMsg) => {
+    // TURBO: 3 descargas simultáneas (Límite conservador para álbumes en Render)
+    await downloadParallel(tasks, 3, (idx, success, errMsg) => {
         session.completed++;
         session.progress.push({
             index: idx,
