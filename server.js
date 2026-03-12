@@ -89,25 +89,25 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath, sessio
 
     // INTENTO 1: SoundCloud (Prioridad 1)
     try {
-        setStatus('Buscando en servidor principal (SoundCloud)...');
+        setStatus('Buscando en SoundCloud...');
         log(`[Turbo 2.0] Buscando en SoundCloud: ${query}`);
         await ytDlp(`scsearch1:${query}`, baseOptions);
         if (fs.existsSync(outputPath)) {
-            setStatus('Procesando audio descargado...');
+            setStatus('Procesando audio...');
             log(`[Éxito SC] Descargado desde SoundCloud`);
             return outputPath;
         }
     } catch (e) {
-        log(`[SC Skip] No encontrado o error: ${e.message.substring(0, 50)}`);
+        log(`[SC Skip] ${e.message.substring(0, 50)}`);
     }
 
-    // INTENTO 2: Audiomack (Respaldo Turbo)
+    // INTENTO 2: Audiomack
     try {
-        setStatus('Buscando en servidor de respaldo (Audiomack)...');
+        setStatus('Buscando en Audiomack...');
         log(`[Turbo 2.0] Buscando en Audiomack: ${query}`);
         await ytDlp(`audiomacksearch1:${query}`, baseOptions);
         if (fs.existsSync(outputPath)) {
-            setStatus('Procesando audio de respaldo...');
+            setStatus('Procesando audio...');
             log(`[Éxito AM] Descargado desde Audiomack`);
             return outputPath;
         }
@@ -115,7 +115,24 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath, sessio
         log(`[AM Error] ${e.message.substring(0, 50)}`);
     }
 
-    throw new Error('No se encontró la pista en SoundCloud ni Audiomack.');
+    // INTENTO 3: YouTube Music (fallback final)
+    try {
+        setStatus('Buscando en YouTube Music...');
+        log(`[Turbo 2.0] Buscando en YouTube Music: ${query}`);
+        await ytDlp(`ytsearch1:${query}`, {
+            ...baseOptions,
+            concurrentFragments: 10
+        });
+        if (fs.existsSync(outputPath)) {
+            setStatus('Procesando audio...');
+            log(`[Éxito YT] Descargado desde YouTube`);
+            return outputPath;
+        }
+    } catch (e) {
+        log(`[YT Error] ${e.message.substring(0, 50)}`);
+    }
+
+    throw new Error('No se encontró la pista en SoundCloud, Audiomack ni YouTube.');
 }
 
 // Track download sessions (in-memory)

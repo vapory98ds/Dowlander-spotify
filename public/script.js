@@ -111,7 +111,7 @@ async function startDownload() {
 
 async function downloadTrack() {
     const statusMsg = document.getElementById('statusMsg');
-    statusMsg.innerText = "⏳ Inicializando descarga...";
+    statusMsg.innerText = "⏳ Iniciando descarga...";
     statusMsg.className = 'status';
 
     const visualColumn = document.getElementById('visualStatusColumn');
@@ -125,24 +125,22 @@ async function downloadTrack() {
     visualColumn.style.display = 'block';
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
-    visualPercent.innerText = '0%';
-    // Imagen empieza en la derecha
-    if (walkingImage) walkingImage.style.right = '0%';
-    if (walkingFill) walkingFill.style.width = '0%';
 
-    let dynamicProgress = 0;
-    
-    // Avanza imagen y barra juntas
-    const advanceProgress = (amount, max) => {
-        if (dynamicProgress < max) {
-            dynamicProgress += amount;
-            if (dynamicProgress > max) dynamicProgress = max;
-            const pct = Math.round(dynamicProgress);
-            visualPercent.innerText = `${pct}%`;
-            if (walkingFill) walkingFill.style.width = `${pct}%`;
-            if (walkingImage) walkingImage.style.right = `${pct}%`; // imagen avanza a la izquierda
-        }
+    let progress = 0;
+    const setBarProgress = (pct) => {
+        pct = Math.min(100, Math.max(0, pct));
+        progress = pct;
+        visualPercent.innerText = `${Math.round(pct)}%`;
+        if (walkingFill) walkingFill.style.width = `${pct}%`;
+        if (walkingImage) walkingImage.style.right = `${pct}%`;
     };
+    setBarProgress(0); // inicia en 0, imagen a la derecha
+
+    // Interval suave: avanza 1.5% cada segundo hasta 85%
+    // (evita que se quede trabada si el servidor no envía eventos)
+    const progressInterval = setInterval(() => {
+        if (progress < 85) setBarProgress(progress + 1.5);
+    }, 1000);
 
     try {
         const startResponse = await fetch(`${API_BASE}/api/start-track-download`, {
@@ -162,55 +160,48 @@ async function downloadTrack() {
         }
 
         const { sessionId } = await startResponse.json();
-        statusMsg.innerText = "🎶 Conectando al servidor...";
+        statusMsg.innerText = "🎶 Descargando...";
 
-        // Listen for progress via SSE
+        // Escuchar fin de descarga via SSE
         await new Promise((resolve, reject) => {
             const eventSource = new EventSource(`${API_BASE}/api/track-progress/${sessionId}`);
 
             eventSource.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                
-                if (data.status === 'downloading') {
-                    // Avanzar barra basado en pasos del servidor, solo mostrar %
-                    if (data.message.includes('SoundCloud')) advanceProgress(18, 40);
-                    else if (data.message.includes('Audiomack')) advanceProgress(18, 40);
-                    else if (data.message.includes('Turbo')) advanceProgress(30, 75);
-                    else if (data.message.includes('metadatos')) advanceProgress(15, 95);
-                    else advanceProgress(3, 95);
-                } else if (data.status === 'done') {
+                if (data.status === 'done') {
                     eventSource.close();
                     resolve();
                 } else if (data.status === 'error') {
                     eventSource.close();
                     reject(new Error(data.error || 'Error procesando pista'));
                 }
+                // 'downloading' events just keep the connection alive; the interval handles the bar
             };
 
             eventSource.onerror = () => {
                 eventSource.close();
-                reject(new Error('Conexión perdida con el servidor de descargas'));
+                reject(new Error('Conexión perdida con el servidor'));
             };
         });
 
-        statusMsg.innerText = "✅ ¡Listo! Empaquetando archivo final...";
+        clearInterval(progressInterval);
+        setBarProgress(95);
+        statusMsg.innerText = "✅ Empaquetando MP3...";
 
         const fileResponse = await fetch(`${API_BASE}/api/download-track-file/${sessionId}`);
-        if (!fileResponse.ok) throw new Error('Error al obtener el MP3 final');
+        if (!fileResponse.ok) throw new Error('El archivo MP3 no está listo');
 
         const blob = await fileResponse.blob();
         triggerDownload(blob, `${currentData.name}.mp3`);
 
-        if (walkingFill) walkingFill.style.width = '100%';
-        if (walkingImage) walkingImage.style.right = '100%';
-        visualPercent.innerText = '100%';
-
+        setBarProgress(100);
         visualDownloading.style.display = 'none';
         visualFinished.style.display = 'flex';
 
-        statusMsg.innerText = "✅ ¡Canción descargada con éxito!";
+        statusMsg.innerText = "✅ ¡Canción descargada!";
         statusMsg.className = 'status success';
     } catch (e) {
+        clearInterval(progressInterval);
         console.error(e);
         statusMsg.innerText = "Error: " + e.message;
         statusMsg.className = 'status error';
