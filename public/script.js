@@ -15,24 +15,16 @@ async function fetchInfo() {
     card.classList.remove('show');
     btn.disabled = true;
 
-    // Mostrar imagen de estado desde el inicio (al buscar)
+    // Ocultar la barra de progreso al hacer nueva búsqueda
     const visualColumn = document.getElementById('visualStatusColumn');
-    const visualDownloading = document.getElementById('visualDownloading');
-    const visualFinished = document.getElementById('visualFinished');
-    const visualPercent = document.getElementById('visualPercent');
-    const walkingImage = document.getElementById('walkingImage');
-    const walkingFill = document.getElementById('walkingFill');
-
     if (visualColumn) {
-        visualColumn.classList.remove('hidden');
-        visualColumn.style.display = 'block';
+        visualColumn.classList.add('hidden');
+        visualColumn.style.display = 'none';
     }
+    const visualDownloading = document.getElementById('visualDownloading');
+    if (visualDownloading) visualDownloading.style.display = 'none';
+    const visualFinished = document.getElementById('visualFinished');
     if (visualFinished) visualFinished.style.display = 'none';
-    if (visualDownloading) visualDownloading.style.display = 'flex';
-    if (visualPercent) visualPercent.innerText = 'Analizando...';
-    // Avanzar un poco la barra para indicar actividad (20%)
-    if (walkingImage) walkingImage.style.right = '80%';
-    if (walkingFill) walkingFill.style.width = '20%';
 
     try {
         const response = await fetch(`${API_BASE}/api/info?url=${encodeURIComponent(url)}`);
@@ -44,20 +36,10 @@ async function fetchInfo() {
         const data = await response.json();
         if (data.error) throw new Error(data.error);
 
-        // Al completar la búsqueda, avanzar a 35% en espera de descarga
-        if (visualPercent) visualPercent.innerText = '¡Listo! Presiona Descargar';
-        if (walkingImage) walkingImage.style.right = '65%';
-        if (walkingFill) walkingFill.style.width = '35%';
-
         currentData = data;
         renderData(data);
     } catch (e) {
         console.error(e);
-        // Ocultar barra si hay error
-        if (visualColumn) {
-            visualColumn.classList.add('hidden');
-            visualColumn.style.display = 'none';
-        }
         alert('Error: ' + e.message);
     } finally {
         loader.classList.add('hidden');
@@ -143,19 +125,17 @@ async function downloadTrack() {
     visualColumn.style.display = 'block';
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
-    visualPercent.innerText = 'Iniciando descarga...';
-    // Continuar desde donde quedó fetchInfo (35%)
-    if (walkingImage) walkingImage.style.right = '65%';
-    if (walkingFill) walkingFill.style.width = '35%';
+    visualPercent.innerText = '0%';
+    if (walkingFill) walkingFill.style.width = '0%';
 
-    let dynamicProgress = 35;
+    let dynamicProgress = 0;
     
     // Función para avanzar la barra progresivamente
     const advanceProgress = (amount, max) => {
         if (dynamicProgress < max) {
             dynamicProgress += amount;
             if (dynamicProgress > max) dynamicProgress = max;
-            if (walkingImage) walkingImage.style.right = `${100 - dynamicProgress}%`;
+            visualPercent.innerText = `${Math.round(dynamicProgress)}%`;
             if (walkingFill) walkingFill.style.width = `${dynamicProgress}%`;
         }
     };
@@ -188,14 +168,12 @@ async function downloadTrack() {
                 const data = JSON.parse(event.data);
                 
                 if (data.status === 'downloading') {
-                    visualPercent.innerText = data.message || 'Descargando...';
-                    // Avanzar la barra en función del texto recibido.
-                    // Esto da una sensación de avance real sin depender de un set interval ciego.
-                    if (data.message.includes('SoundCloud')) advanceProgress(25, 30);
-                    else if (data.message.includes('Audiomack')) advanceProgress(25, 30);
-                    else if (data.message.includes('Turbo')) advanceProgress(40, 70);
-                    else if (data.message.includes('metadatos')) advanceProgress(20, 95);
-                    else advanceProgress(5, 95); // Heartbeat genérico
+                    // Avanzar barra basado en pasos del servidor, solo mostrar %
+                    if (data.message.includes('SoundCloud')) advanceProgress(18, 40);
+                    else if (data.message.includes('Audiomack')) advanceProgress(18, 40);
+                    else if (data.message.includes('Turbo')) advanceProgress(30, 75);
+                    else if (data.message.includes('metadatos')) advanceProgress(15, 95);
+                    else advanceProgress(3, 95);
                 } else if (data.status === 'done') {
                     eventSource.close();
                     resolve();
@@ -219,8 +197,8 @@ async function downloadTrack() {
         const blob = await fileResponse.blob();
         triggerDownload(blob, `${currentData.name}.mp3`);
 
-        if (walkingImage) walkingImage.style.right = '0%';
         if (walkingFill) walkingFill.style.width = '100%';
+        visualPercent.innerText = '100%';
 
         visualDownloading.style.display = 'none';
         visualFinished.style.display = 'flex';
@@ -265,7 +243,6 @@ async function downloadAlbum() {
     }
 
     const { sessionId, total } = await startResponse.json();
-    progressText.innerText = `Descargando 0 de ${total} canciones...`;
 
     // Step 2: Listen for progress via SSE
     await new Promise((resolve, reject) => {
@@ -291,14 +268,9 @@ async function downloadAlbum() {
                     }
                 }
 
-                // Update progress bar
+                // Actualizar barra visual
                 const percent = Math.round((data.completed / data.total) * 100);
-                progressFill.style.width = `${percent}%`;
-                progressPercent.innerText = `${percent}%`;
-                progressText.innerText = `Descargando ${data.completed} de ${data.total} canciones...`;
-                
                 visualPercent.innerText = `${percent}%`;
-                if (walkingImage) walkingImage.style.right = `${100 - percent}%`;
                 if (walkingFill) walkingFill.style.width = `${percent}%`;
 
                 // Scroll to track
@@ -310,7 +282,6 @@ async function downloadAlbum() {
 
                 if (data.status === 'done') {
                     visualPercent.innerText = '100%';
-                    if (walkingImage) walkingImage.style.right = '0%';
                     if (walkingFill) walkingFill.style.width = '100%';
                     resolve();
                 } else {

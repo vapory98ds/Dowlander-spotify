@@ -1158,99 +1158,127 @@ input[type="url"]::placeholder {
 }
 
 /* =========================================
-   CUSTOM STATUS COLUMN (EXTERNAL)
+   BARRA DE PROGRESO ESTILO PERSONAJE
    ========================================= */
 .external-status-container {
     width: 100%;
-    max-width: 650px;
+    max-width: 680px;
     margin: 0 auto 2rem;
     padding: 0 10px;
-    /* Sin tarjeta, sin bordes, aspecto limpio y transparente */
 }
 
-.visual-state {
+/* Estado 1: Descargando - layout en fila */
+#visualDownloading {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+}
+
+/* El personaje caminante queda a la izquierda, fuera de la barra */
+.walking-character {
+    flex: 0 0 auto;
+    width: 90px;
+    height: 90px;
+    z-index: 2;
+    position: relative;
+    /* Sombra blanca difusa para resaltar sobre fondo oscuro */
+    filter: drop-shadow(0 0 8px rgba(255,255,255,0.25));
+    animation: walkBounce 0.6s infinite alternate ease-in-out;
+}
+
+@keyframes walkBounce {
+    from { transform: translateY(0px) rotate(-2deg); }
+    to   { transform: translateY(-5px) rotate(2deg); }
+}
+
+/* Contenedor de la barra + porcentaje */
+.bar-area {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 15px;
-    text-align: center;
-    width: 100%;
+    gap: 6px;
 }
 
+/* La pista de fondo de la barra */
 .walking-track {
     width: 100%;
-    height: 72px; /* Más alto para mejor visibilidad de la imagen */
+    height: 40px;
     position: relative;
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 36px;
-    box-shadow: inset 0 3px 12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.05);
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 4px;
+    border: 2px solid rgba(0, 220, 255, 0.6);
+    box-shadow: 0 0 12px rgba(0, 220, 255, 0.25), inset 0 0 10px rgba(0,0,0,0.4);
     overflow: hidden;
-    margin-top: 8px;
 }
 
+/* El relleno con rayas cian animadas */
 .walking-fill {
     position: absolute;
     top: 0;
     bottom: 0;
     left: 0;
     width: 0%;
-    background: linear-gradient(90deg, #1DB954, #1ed760);
-    border-radius: 30px;
-    transition: width 0.3s ease-out;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(0, 220, 255, 0.7) 0px,
+        rgba(0, 220, 255, 0.7) 18px,
+        rgba(0, 180, 220, 0.5) 18px,
+        rgba(0, 180, 220, 0.5) 32px
+    );
+    box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.3);
+    transition: width 0.4s ease-out;
+    animation: stripeScroll 1s linear infinite;
+    background-size: 50px 50px;
 }
 
-.custom-status-img {
-    height: 100%; /* La imagen toma la altura de la pista */
-    width: auto;
-    border-radius: 12px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-    object-fit: contain;
-    position: absolute;
-    /* Inicia a la derecha (0% completado). Se moverá hacia la izquierda (100% completado) */
-    right: 0%; 
-    top: 0;
-    transition: right 0.3s ease-out; /* Movimiento fluido */
+@keyframes stripeScroll {
+    from { background-position: 0 0; }
+    to   { background-position: 50px 0; }
 }
 
-/* Imagen finalizada (ya no es parte de la pista animada) */
-#visualFinished .custom-status-img {
-    position: relative;
-    right: auto;
-    height: auto;
-    max-width: 100%;
-}
-
-.pulse-anim {
-    animation: slowPulse 2s infinite alternate ease-in-out;
-}
-
-.pop-anim {
-    animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-.custom-status-text {
-    font-size: 1.1rem;
+/* Texto del porcentaje debajo de la barra */
+.percent-label {
+    font-size: 0.85rem;
     font-weight: 700;
+    color: rgba(0, 220, 255, 0.9);
+    text-align: right;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 8px rgba(0, 220, 255, 0.5);
+}
+
+/* Estado 2: Finalizado - imagen pequeña centrada */
+#visualFinished {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+    animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.finish-img {
+    width: 130px;  /* pequeña */
+    height: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 12px rgba(29, 185, 84, 0.5));
 }
 
 .success-text {
     color: var(--accent-light);
+    font-weight: 700;
+    font-size: 1.1rem;
     text-shadow: 0 0 10px rgba(29, 185, 84, 0.4);
 }
 
-@keyframes slowPulse {
-    from { transform: scale(0.98); opacity: 0.9; }
-    to { transform: scale(1.02); opacity: 1; filter: drop-shadow(0 0 15px rgba(29, 185, 84, 0.4)); }
-}
-
 @keyframes popIn {
-    0% { transform: scale(0.8) translateY(20px); opacity: 0; }
-    100% { transform: scale(1) translateY(0); opacity: 1; }
+    0%   { transform: scale(0.7) translateY(20px); opacity: 0; }
+    100% { transform: scale(1) translateY(0);       opacity: 1; }
 }
 
-@media (max-width: 768px) {
-    .external-status-container {
-        padding: 15px;
-        margin-bottom: 1.5rem;
-    }
+@media (max-width: 600px) {
+    .walking-character { width: 68px; height: 68px; }
+    .walking-track { height: 32px; }
+    .finish-img { width: 100px; }
 }

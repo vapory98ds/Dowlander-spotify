@@ -63,20 +63,24 @@
             <p>Analizando enlace...</p>
         </div>
 
-        <!-- Columna de Estado Visual Externa -->
+        <!-- Barra de progreso de descarga (solo visible al descargar) -->
         <div class="external-status-container hidden" id="visualStatusColumn">
             <!-- Estado 1: Descargando -->
-            <div id="visualDownloading" class="visual-state" style="display: none;">
-                <div class="walking-track">
-                    <div class="walking-fill" id="walkingFill"></div>
-                    <img src="barra de estado a lado izquierdo.png" alt="Descargando" id="walkingImage" class="custom-status-img pulse-anim">
+            <div id="visualDownloading" style="display: none;">
+                <!-- Personaje a la izquierda -->
+                <img src="barra de estado a lado izquierdo.png" alt="Descargando" id="walkingImage" class="walking-character">
+                <!-- Barra + porcentaje a la derecha -->
+                <div class="bar-area">
+                    <div class="walking-track">
+                        <div class="walking-fill" id="walkingFill"></div>
+                    </div>
+                    <span class="percent-label" id="visualPercent">0%</span>
                 </div>
-                <div class="custom-status-text text-gradient">Descargando... <span id="visualPercent">0%</span></div>
             </div>
             <!-- Estado 2: Finalizado -->
-            <div id="visualFinished" class="visual-state" style="display: none;">
-                <img src="estado finalizado.png" alt="Finalizado" class="custom-status-img pop-anim">
-                <div class="custom-status-text success-text">Descarga finalizada</div>
+            <div id="visualFinished" style="display: none;">
+                <img src="estado finalizado.png" alt="Finalizado" class="finish-img">
+                <div class="success-text">✅ Descarga finalizada</div>
             </div>
         </div>
 
