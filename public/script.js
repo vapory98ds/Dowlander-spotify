@@ -15,16 +15,24 @@ async function fetchInfo() {
     card.classList.remove('show');
     btn.disabled = true;
 
-    // Reset progress visual
+    // Mostrar imagen de estado desde el inicio (al buscar)
     const visualColumn = document.getElementById('visualStatusColumn');
-    if (visualColumn) {
-        visualColumn.classList.add('hidden');
-        visualColumn.style.display = 'none';
-    }
     const visualDownloading = document.getElementById('visualDownloading');
-    if (visualDownloading) visualDownloading.style.display = 'none';
     const visualFinished = document.getElementById('visualFinished');
+    const visualPercent = document.getElementById('visualPercent');
+    const walkingImage = document.getElementById('walkingImage');
+    const walkingFill = document.getElementById('walkingFill');
+
+    if (visualColumn) {
+        visualColumn.classList.remove('hidden');
+        visualColumn.style.display = 'block';
+    }
     if (visualFinished) visualFinished.style.display = 'none';
+    if (visualDownloading) visualDownloading.style.display = 'flex';
+    if (visualPercent) visualPercent.innerText = 'Analizando...';
+    // Avanzar un poco la barra para indicar actividad (20%)
+    if (walkingImage) walkingImage.style.right = '80%';
+    if (walkingFill) walkingFill.style.width = '20%';
 
     try {
         const response = await fetch(`${API_BASE}/api/info?url=${encodeURIComponent(url)}`);
@@ -36,10 +44,20 @@ async function fetchInfo() {
         const data = await response.json();
         if (data.error) throw new Error(data.error);
 
+        // Al completar la búsqueda, avanzar a 35% en espera de descarga
+        if (visualPercent) visualPercent.innerText = '¡Listo! Presiona Descargar';
+        if (walkingImage) walkingImage.style.right = '65%';
+        if (walkingFill) walkingFill.style.width = '35%';
+
         currentData = data;
         renderData(data);
     } catch (e) {
         console.error(e);
+        // Ocultar barra si hay error
+        if (visualColumn) {
+            visualColumn.classList.add('hidden');
+            visualColumn.style.display = 'none';
+        }
         alert('Error: ' + e.message);
     } finally {
         loader.classList.add('hidden');
@@ -125,11 +143,12 @@ async function downloadTrack() {
     visualColumn.style.display = 'block';
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
-    visualPercent.innerText = 'Iniciando conexión...';
-    if (walkingImage) walkingImage.style.right = '100%';
-    if (walkingFill) walkingFill.style.width = '0%';
+    visualPercent.innerText = 'Iniciando descarga...';
+    // Continuar desde donde quedó fetchInfo (35%)
+    if (walkingImage) walkingImage.style.right = '65%';
+    if (walkingFill) walkingFill.style.width = '35%';
 
-    let dynamicProgress = 0;
+    let dynamicProgress = 35;
     
     // Función para avanzar la barra progresivamente
     const advanceProgress = (amount, max) => {
@@ -229,9 +248,10 @@ async function downloadAlbum() {
     visualColumn.style.display = 'block';
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
-    visualPercent.innerText = '0%';
-    if (walkingImage) walkingImage.style.right = '100%';
-    if (walkingFill) walkingFill.style.width = '0%';
+    visualPercent.innerText = 'Iniciando descarga del álbum...';
+    // Continuar desde donde quedó fetchInfo (35%)
+    if (walkingImage) walkingImage.style.right = '65%';
+    if (walkingFill) walkingFill.style.width = '35%';
 
     // Step 1: Start album download (get session ID)
     const startResponse = await fetch(`${API_BASE}/api/start-album-download`, {
