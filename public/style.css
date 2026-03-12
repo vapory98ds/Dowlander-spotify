@@ -1158,7 +1158,7 @@ input[type="url"]::placeholder {
 }
 
 /* =========================================
-   BARRA DE PROGRESO ESTILO PERSONAJE
+   BARRA DE PROGRESO - PERSONAJE CAMINANTE
    ========================================= */
 .external-status-container {
     width: 100%;
@@ -1167,88 +1167,77 @@ input[type="url"]::placeholder {
     padding: 0 10px;
 }
 
-/* Estado 1: Descargando - layout en fila */
+/* Estado 1: contenedor con espacio para la imagen encima */
 #visualDownloading {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0;
+    flex-direction: column;
+    gap: 8px;
     width: 100%;
 }
 
-/* El personaje caminante queda a la izquierda, fuera de la barra */
-.walking-character {
-    flex: 0 0 auto;
-    width: 90px;
-    height: 90px;
-    z-index: 2;
+/* Wrapper que contiene la imagen flotante + la pista */
+.progress-outer {
     position: relative;
-    /* Sombra blanca difusa para resaltar sobre fondo oscuro */
-    filter: drop-shadow(0 0 8px rgba(255,255,255,0.25));
-    animation: walkBounce 0.6s infinite alternate ease-in-out;
+    width: 100%;
+    padding-top: 58px; /* espacio para que la imagen quede encima */
+}
+
+/* La imagen del personaje, absolutamente fuera de la pista */
+.walking-character {
+    position: absolute;
+    width: 60px;
+    height: auto;
+    object-fit: contain;
+    bottom: 0;          /* alineada con la parte superior de la barra */
+    right: 0%;          /* JS actualiza esto en tiempo real */
+    transform: translateX(30%);
+    z-index: 3;
+    transition: right 0.35s ease-out;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+    animation: walkBounce 0.55s infinite alternate ease-in-out;
 }
 
 @keyframes walkBounce {
-    from { transform: translateY(0px) rotate(-2deg); }
-    to   { transform: translateY(-5px) rotate(2deg); }
+    from { transform: translateX(30%) translateY(0px);   }
+    to   { transform: translateX(30%) translateY(-5px);  }
 }
 
-/* Contenedor de la barra + porcentaje */
-.bar-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-/* La pista de fondo de la barra */
+/* Pista delgada y limpia */
 .walking-track {
     width: 100%;
-    height: 40px;
+    height: 22px;
     position: relative;
-    background: rgba(0, 0, 0, 0.35);
-    border-radius: 4px;
-    border: 2px solid rgba(0, 220, 255, 0.6);
-    box-shadow: 0 0 12px rgba(0, 220, 255, 0.25), inset 0 0 10px rgba(0,0,0,0.4);
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 11px;
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
-/* El relleno con rayas cian animadas */
+/* Relleno verde anclado a la derecha, crece hacia la izquierda */
 .walking-fill {
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 0;
-    width: 0%;
-    background: repeating-linear-gradient(
-        45deg,
-        rgba(0, 220, 255, 0.7) 0px,
-        rgba(0, 220, 255, 0.7) 18px,
-        rgba(0, 180, 220, 0.5) 18px,
-        rgba(0, 180, 220, 0.5) 32px
-    );
-    box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.3);
-    transition: width 0.4s ease-out;
-    animation: stripeScroll 1s linear infinite;
-    background-size: 50px 50px;
+    right: 0;            /* ancla en la derecha */
+    width: 0%;           /* JS actualiza el ancho: 0% → 100% */
+    background: linear-gradient(270deg, #1ed760, #1DB954);
+    border-radius: 11px;
+    transition: width 0.35s ease-out;
+    box-shadow: 0 0 10px rgba(29, 185, 84, 0.4);
 }
 
-@keyframes stripeScroll {
-    from { background-position: 0 0; }
-    to   { background-position: 50px 0; }
-}
-
-/* Texto del porcentaje debajo de la barra */
+/* Etiqueta del porcentaje */
 .percent-label {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 700;
-    color: rgba(0, 220, 255, 0.9);
+    color: var(--accent-light);
     text-align: right;
-    letter-spacing: 0.5px;
-    text-shadow: 0 0 8px rgba(0, 220, 255, 0.5);
+    letter-spacing: 0.4px;
+    text-shadow: 0 0 6px rgba(29, 185, 84, 0.4);
 }
 
-/* Estado 2: Finalizado - imagen pequeña centrada */
+/* Estado 2: Finalizado, imagen pequeña centrada */
 #visualFinished {
     display: flex;
     flex-direction: column;
@@ -1259,7 +1248,7 @@ input[type="url"]::placeholder {
 }
 
 .finish-img {
-    width: 130px;  /* pequeña */
+    width: 120px;
     height: auto;
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(29, 185, 84, 0.5));
@@ -1268,8 +1257,8 @@ input[type="url"]::placeholder {
 .success-text {
     color: var(--accent-light);
     font-weight: 700;
-    font-size: 1.1rem;
-    text-shadow: 0 0 10px rgba(29, 185, 84, 0.4);
+    font-size: 1rem;
+    text-shadow: 0 0 8px rgba(29, 185, 84, 0.4);
 }
 
 @keyframes popIn {
@@ -1278,7 +1267,7 @@ input[type="url"]::placeholder {
 }
 
 @media (max-width: 600px) {
-    .walking-character { width: 68px; height: 68px; }
-    .walking-track { height: 32px; }
-    .finish-img { width: 100px; }
+    .walking-character { width: 48px; }
+    .walking-track { height: 18px; }
+    .finish-img { width: 95px; }
 }

@@ -126,17 +126,21 @@ async function downloadTrack() {
     visualDownloading.style.display = 'flex';
     visualFinished.style.display = 'none';
     visualPercent.innerText = '0%';
+    // Imagen empieza en la derecha
+    if (walkingImage) walkingImage.style.right = '0%';
     if (walkingFill) walkingFill.style.width = '0%';
 
     let dynamicProgress = 0;
     
-    // Función para avanzar la barra progresivamente
+    // Avanza imagen y barra juntas
     const advanceProgress = (amount, max) => {
         if (dynamicProgress < max) {
             dynamicProgress += amount;
             if (dynamicProgress > max) dynamicProgress = max;
-            visualPercent.innerText = `${Math.round(dynamicProgress)}%`;
-            if (walkingFill) walkingFill.style.width = `${dynamicProgress}%`;
+            const pct = Math.round(dynamicProgress);
+            visualPercent.innerText = `${pct}%`;
+            if (walkingFill) walkingFill.style.width = `${pct}%`;
+            if (walkingImage) walkingImage.style.right = `${pct}%`; // imagen avanza a la izquierda
         }
     };
 
@@ -198,6 +202,7 @@ async function downloadTrack() {
         triggerDownload(blob, `${currentData.name}.mp3`);
 
         if (walkingFill) walkingFill.style.width = '100%';
+        if (walkingImage) walkingImage.style.right = '100%';
         visualPercent.innerText = '100%';
 
         visualDownloading.style.display = 'none';
@@ -272,6 +277,7 @@ async function downloadAlbum() {
                 const percent = Math.round((data.completed / data.total) * 100);
                 visualPercent.innerText = `${percent}%`;
                 if (walkingFill) walkingFill.style.width = `${percent}%`;
+                if (walkingImage) walkingImage.style.right = `${percent}%`;
 
                 // Scroll to track
                 if (li) li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -283,6 +289,7 @@ async function downloadAlbum() {
                 if (data.status === 'done') {
                     visualPercent.innerText = '100%';
                     if (walkingFill) walkingFill.style.width = '100%';
+                    if (walkingImage) walkingImage.style.right = '100%';
                     resolve();
                 } else {
                     reject(new Error('Error procesando álbum'));

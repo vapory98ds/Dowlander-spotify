@@ -67,15 +67,14 @@
         <div class="external-status-container hidden" id="visualStatusColumn">
             <!-- Estado 1: Descargando -->
             <div id="visualDownloading" style="display: none;">
-                <!-- Personaje a la izquierda -->
-                <img src="barra de estado a lado izquierdo.png" alt="Descargando" id="walkingImage" class="walking-character">
-                <!-- Barra + porcentaje a la derecha -->
-                <div class="bar-area">
+                <!-- progress-outer: imagen flota encima de la barra -->
+                <div class="progress-outer">
+                    <img src="barra de estado a lado izquierdo.png" alt="Descargando" id="walkingImage" class="walking-character">
                     <div class="walking-track">
                         <div class="walking-fill" id="walkingFill"></div>
                     </div>
-                    <span class="percent-label" id="visualPercent">0%</span>
                 </div>
+                <span class="percent-label" id="visualPercent">0%</span>
             </div>
             <!-- Estado 2: Finalizado -->
             <div id="visualFinished" style="display: none;">
