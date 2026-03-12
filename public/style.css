@@ -1179,13 +1179,13 @@ input[type="url"]::placeholder {
 .progress-outer {
     position: relative;
     width: 100%;
-    padding-top: 76px; /* espacio para que la imagen quede encima */
+    padding-top: 90px;
 }
 
 /* La imagen del personaje, absolutamente fuera de la pista */
 .walking-character {
     position: absolute;
-    width: 90px;
+    width: 115px;
     height: auto;
     object-fit: contain;
     bottom: 0;          /* alineada con la parte superior de la barra */

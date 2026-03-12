@@ -60,7 +60,26 @@ async function downloadImage(url) {
     } catch (e) { return null; }
 }
 
-// Motor principal de descarga - MODO TURBO 2.0 (SoundCloud + Audiomack)
+// Verifica que el archivo descargado dure más de 60 segundos (no es preview)
+async function checkFileDuration(filePath) {
+    return new Promise((resolve) => {
+        const ffprobePath = path.join(path.dirname(ffmpegPath), 'ffprobe');
+        const ffprobe = require('child_process').spawn(
+            ffprobePath,
+            ['-v', 'error', '-show_entries', 'format=duration',
+             '-of', 'default=noprint_wrappers=1:nokey=1', filePath]
+        );
+        let output = '';
+        ffprobe.stdout.on('data', d => output += d);
+        ffprobe.on('close', () => {
+            const secs = parseFloat(output.trim());
+            resolve(isNaN(secs) ? 999 : secs); // si ffprobe falla, asumir OK para no bloquear
+        });
+        ffprobe.on('error', () => resolve(999));
+    });
+}
+
+// Motor principal de descarga - TURBO 3.0 (SC > Audiomack > YouTube)
 async function downloadAudio(trackId, trackName, trackArtist, outputPath, session = null) {
     const query = `${trackArtist} - ${trackName}`;
     const baseOptions = {
@@ -73,66 +92,76 @@ async function downloadAudio(trackId, trackName, trackArtist, outputPath, sessio
         noWarnings: true,
         preferFreeFormats: true,
         noPlaylist: true,
-        concurrentFragments: 20, // Aumentado a 20 para intentar mejorar velocidad
         noCacheDir: true,
         addHeader: [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         ]
     };
 
-    // Actualizar estado si se pasó la sesión
     const setStatus = (msg) => {
         if (session && session.status !== 'done' && session.status !== 'error') {
             session.dynamicStatus = msg;
         }
     };
 
-    // INTENTO 1: SoundCloud (Prioridad 1)
+    // Helper: éxito real solo si el archivo existe Y dura más de 60 segundos
+    const acceptFile = async (source) => {
+        if (!fs.existsSync(outputPath)) return false;
+        const duration = await checkFileDuration(outputPath);
+        if (duration < 60) {
+            log(`[${source}] Archivo corto (${Math.round(duration)}s) detectado - descartando`);
+            try { fs.unlinkSync(outputPath); } catch(e) {}
+            return false;
+        }
+        log(`[${source}] ✔ Duración OK: ${Math.round(duration)}s`);
+        return true;
+    };
+
+    // INTENTO 1: SoundCloud
     try {
         setStatus('Buscando en SoundCloud...');
-        log(`[Turbo 2.0] Buscando en SoundCloud: ${query}`);
-        await ytDlp(`scsearch1:${query}`, baseOptions);
-        if (fs.existsSync(outputPath)) {
-            setStatus('Procesando audio...');
-            log(`[Éxito SC] Descargado desde SoundCloud`);
-            return outputPath;
-        }
+        log(`[SC] Descargando: ${query}`);
+        await ytDlp(`scsearch3:${query}`, {
+            ...baseOptions,
+            concurrentFragments: 20,
+            matchFilter: 'duration > 60' 
+        });
+        if (await acceptFile('SC')) return outputPath;
     } catch (e) {
-        log(`[SC Skip] ${e.message.substring(0, 50)}`);
+        log(`[SC Skip] ${e.message.substring(0, 80)}`);
+        try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch(_) {}
     }
 
     // INTENTO 2: Audiomack
     try {
         setStatus('Buscando en Audiomack...');
-        log(`[Turbo 2.0] Buscando en Audiomack: ${query}`);
-        await ytDlp(`audiomacksearch1:${query}`, baseOptions);
-        if (fs.existsSync(outputPath)) {
-            setStatus('Procesando audio...');
-            log(`[Éxito AM] Descargado desde Audiomack`);
-            return outputPath;
-        }
+        log(`[AM] Descargando: ${query}`);
+        await ytDlp(`audiomacksearch1:${query}`, {
+            ...baseOptions,
+            concurrentFragments: 20,
+            matchFilter: 'duration > 60'
+        });
+        if (await acceptFile('AM')) return outputPath;
     } catch (e) {
-        log(`[AM Error] ${e.message.substring(0, 50)}`);
+        log(`[AM Error] ${e.message.substring(0, 80)}`);
+        try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch(_) {}
     }
 
-    // INTENTO 3: YouTube Music (fallback final)
+    // INTENTO 3: YouTube
     try {
-        setStatus('Buscando en YouTube Music...');
-        log(`[Turbo 2.0] Buscando en YouTube Music: ${query}`);
+        setStatus('Buscando en YouTube...');
+        log(`[YT] Descargando: ${query}`);
         await ytDlp(`ytsearch1:${query}`, {
             ...baseOptions,
             concurrentFragments: 10
         });
-        if (fs.existsSync(outputPath)) {
-            setStatus('Procesando audio...');
-            log(`[Éxito YT] Descargado desde YouTube`);
-            return outputPath;
-        }
+        if (await acceptFile('YT')) return outputPath;
     } catch (e) {
-        log(`[YT Error] ${e.message.substring(0, 50)}`);
+        log(`[YT Error] ${e.message.substring(0, 80)}`);
+        try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch(_) {}
     }
 
-    throw new Error('No se encontró la pista en SoundCloud, Audiomack ni YouTube.');
+    throw new Error('No se encontró la pista completa en ninguna fuente.');
 }
 
 // Track download sessions (in-memory)
